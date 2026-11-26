@@ -49,10 +49,21 @@ export interface TOTPEnableResponse {
   recovery_codes: string[];
 }
 
+export interface TranscoderStatus {
+  ffmpeg_available: boolean;
+  hw_accel: string;        // "vaapi" | "qsv" | "nvenc" | "videotoolbox" | "software"
+  vaapi_device?: string;   // e.g. "/dev/dri/renderD128"
+  hdr_tonemap: boolean;    // CPU zscale+tonemap
+  tonemap_vaapi: boolean;  // GPU VA-API tone-mapping
+  libplacebo: boolean;     // libplacebo Dolby Vision tone-mapping
+  probe_notes?: string[];  // startup probe diagnostics (e.g. EACCES or driver errors)
+}
+
 export interface StreamingConfig {
   max_global_transcodes: number; // 0 = unlimited
   max_user_transcodes: number;   // 0 = unlimited
   idle_timeout_minutes: number;  // 1..120
+  transcoder?: TranscoderStatus;
 }
 
 export interface MaintenanceConfig {
@@ -269,6 +280,7 @@ export interface DirectLink {
 export interface PlaybackLaunchOptions {
   audioStreamIndex?: number;
   subtitleIndex?: number | null;
+  burnSubtitleStreamIndex?: number;
   startPositionMS?: number;
 }
 
@@ -1118,31 +1130,68 @@ export function detectBrowserCapabilities() {
   const video_codecs: string[] = [];
   const audio_codecs: string[] = [];
 
-  if (v.canPlayType('video/mp4')) containers.push('mp4', 'm4v');
-  if (v.canPlayType('video/webm')) containers.push('webm');
-  if (v.canPlayType('video/quicktime')) containers.push('mov');
+  // When MediaSource (MSE / hls.js) is available, fMP4 HLS remuxes go through MSE rather than
+  // native <video>, so codecs that Lune may remux into fMP4 must be checked against MSE too.
+  const hasMSE =
+    typeof MediaSource !== 'undefined' && typeof MediaSource.isTypeSupported === 'function';
 
-  if (v.canPlayType('video/mp4; codecs="avc1.640028"')) video_codecs.push('h264');
-  const hevc8 = Boolean(v.canPlayType('video/mp4; codecs="hvc1.1.6.L93.B0"'));
-  const hevc10 = Boolean(v.canPlayType('video/mp4; codecs="hvc1.2.4.L153.B0"'));
+  const canPlayNative = (mime: string, strict = false): boolean => {
+    const res = v.canPlayType(mime);
+    return strict ? res === 'probably' : res === 'probably' || res === 'maybe';
+  };
+
+  const canPlayWithMSE = (mime: string, strict = false): boolean => {
+    if (!canPlayNative(mime, strict)) return false;
+    return hasMSE ? MediaSource.isTypeSupported(mime) : true;
+  };
+
+  if (canPlayNative('video/mp4')) containers.push('mp4', 'm4v');
+  if (canPlayNative('video/webm')) containers.push('webm');
+  if (canPlayNative('video/quicktime')) containers.push('mov');
+
+  if (canPlayWithMSE('video/mp4; codecs="avc1.640028"')) video_codecs.push('h264');
+
+  // Probe HEVC using hvc1 (Apple/fMP4-standard tag that Lune emits with -tag:v hvc1).
+  // Require MSE support when MSE is active so hls.js remuxes don't fail on browsers whose
+  // native <video> claims HEVC without MSE HEVC support.
+  const hevc8 =
+    canPlayWithMSE('video/mp4; codecs="hvc1.1.6.L120.90"', true) ||
+    canPlayWithMSE('video/mp4; codecs="hvc1.1.6.L93.B0"', true);
+  const hevc10 =
+    canPlayWithMSE('video/mp4; codecs="hvc1.2.4.L120.90"', true) ||
+    canPlayWithMSE('video/mp4; codecs="hvc1.2.4.L153.B0"', true);
   if (hevc8 || hevc10) video_codecs.push('hevc');
-  if (v.canPlayType('video/webm; codecs="vp9"')) video_codecs.push('vp9');
-  if (v.canPlayType('video/mp4; codecs="av01.0.08M.08"')) video_codecs.push('av1');
 
-  if (v.canPlayType('audio/mp4; codecs="mp4a.40.2"')) audio_codecs.push('aac');
-  if (v.canPlayType('audio/webm; codecs="opus"')) audio_codecs.push('opus');
-  if (v.canPlayType('audio/mp4; codecs="ec-3"')) audio_codecs.push('eac3');
-  if (v.canPlayType('audio/mp4; codecs="ac-3"')) audio_codecs.push('ac3');
-  if (v.canPlayType('audio/mpeg')) audio_codecs.push('mp3');
-  if (v.canPlayType('audio/flac')) audio_codecs.push('flac');
+  if (canPlayNative('video/webm; codecs="vp9"')) video_codecs.push('vp9');
+  if (canPlayWithMSE('video/mp4; codecs="av01.0.08M.08"')) video_codecs.push('av1');
 
+  if (canPlayWithMSE('audio/mp4; codecs="mp4a.40.2"')) audio_codecs.push('aac');
+  if (canPlayNative('audio/webm; codecs="opus"')) audio_codecs.push('opus');
+  // Use strict 'probably' + MSE check for Dolby codecs to avoid silent Direct Play / remux
+  // on browsers that return 'maybe' without a working AC-3/E-AC-3 decoder.
+  if (canPlayWithMSE('audio/mp4; codecs="ec-3"', true)) audio_codecs.push('eac3');
+  if (canPlayWithMSE('audio/mp4; codecs="ac-3"', true)) audio_codecs.push('ac3');
+  if (canPlayNative('audio/mpeg')) audio_codecs.push('mp3');
+  if (canPlayNative('audio/flac')) audio_codecs.push('flac');
+
+  // Browsers do not reliably decode 10-bit H.264 (Hi10P, common in anime).
   const supports_10bit_h264 = false;
   const supports_10bit_hevc = hevc10;
-  const supports_hdr =
+
+  const displayHDR =
     typeof window !== 'undefined' && typeof window.matchMedia === 'function'
       ? window.matchMedia('(dynamic-range: high)').matches
       : false;
-  const supports_dovi = Boolean(v.canPlayType('video/mp4; codecs="dvh1.05.06"'));
+  const supports_hdr = displayHDR && (supports_10bit_hevc || video_codecs.includes('av1'));
+
+  // Only claim Dolby Vision when the display is HDR AND the browser reports 'probably'
+  // (plus MSE support when MSE is active) for DoVi Profile 5, preventing green/purple
+  // video on HDR10-only displays or browsers.
+  const supports_dovi =
+    supports_hdr && canPlayWithMSE('video/mp4; codecs="dvh1.05.06"', true);
+
+  // Only advertise 5.1 (6ch) when Dolby surround decoding is supported; otherwise request
+  // stereo (2ch) so FFmpeg cleanly downmixes 5.1/7.1 tracks instead of quiet/broken audio.
   const max_audio_channels =
     audio_codecs.includes('eac3') || audio_codecs.includes('ac3') ? 6 : 2;
 
