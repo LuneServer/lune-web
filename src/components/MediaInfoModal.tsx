@@ -43,7 +43,7 @@ export function MediaInfoModal({ detail, onClose }: Props) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl bg-surface/92 backdrop-blur-xl backdrop-saturate-150 border border-tone/12 shadow-2xl p-6 space-y-5"
+        className="w-full max-w-2xl max-h-[90dvh] overflow-y-auto rounded-2xl bg-surface/92 backdrop-blur-xl backdrop-saturate-150 border border-tone/12 shadow-2xl p-4 sm:p-6 space-y-5"
       >
         <div className="flex items-start justify-between gap-4 pb-3 border-b border-tone/[0.08]">
           <div className="min-w-0">

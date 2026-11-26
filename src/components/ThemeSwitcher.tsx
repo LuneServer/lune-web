@@ -4,6 +4,8 @@ import { useTheme, type ThemePreference } from '../lib/theme';
 interface Props {
   /** 'compact' shows icon-only segmented pill on sm+ and a cycle icon on mobile; 'labeled' shows text labels too */
   variant?: 'compact' | 'labeled';
+  /** Expand labeled variant to fill its container width */
+  fullWidth?: boolean;
 }
 
 const OPTIONS: { id: ThemePreference; label: string; title: string; icon: typeof Monitor }[] = [
@@ -12,7 +14,7 @@ const OPTIONS: { id: ThemePreference; label: string; title: string; icon: typeof
   { id: 'dark', label: 'Dark', title: 'Dark Mode', icon: Moon },
 ];
 
-export function ThemeSwitcher({ variant = 'compact' }: Props) {
+export function ThemeSwitcher({ variant = 'compact', fullWidth = false }: Props) {
   const { theme, setTheme, cycleTheme } = useTheme();
   const current = OPTIONS.find((o) => o.id === theme) ?? OPTIONS[0];
   const CurrentIcon = current.icon;
@@ -22,7 +24,7 @@ export function ThemeSwitcher({ variant = 'compact' }: Props) {
       <div
         role="radiogroup"
         aria-label="Appearance"
-        className="inline-flex items-center rounded-full bg-surface/80 backdrop-blur-xl backdrop-saturate-150 border border-tone/10 p-0.5 gap-0.5"
+        className={`${fullWidth ? 'grid grid-cols-3 w-full' : 'inline-flex'} items-center rounded-full bg-surface/80 backdrop-blur-xl backdrop-saturate-150 border border-tone/10 p-0.5 gap-0.5`}
       >
         {OPTIONS.map((opt) => {
           const Icon = opt.icon;
@@ -35,13 +37,13 @@ export function ThemeSwitcher({ variant = 'compact' }: Props) {
               aria-checked={active}
               title={opt.title}
               onClick={() => setTheme(opt.id)}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
+              className={`inline-flex items-center justify-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer ${
                 active
                   ? 'bg-tone/12 text-ink'
                   : 'text-ink-secondary hover:text-ink'
               }`}
             >
-              <Icon className="w-3.5 h-3.5" />
+              <Icon className="w-3.5 h-3.5 shrink-0" />
               <span>{opt.label}</span>
             </button>
           );
