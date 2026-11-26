@@ -91,6 +91,8 @@ export function ConsoleMaintenance() {
   const [auditDaysInput, setAuditDaysInput] = useState('90');
 
   const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState(false);
+  const [loadErr, setLoadErr] = useState('');
   const [saving, setSaving] = useState(false);
   const [runningNow, setRunningNow] = useState(false);
   const [err, setErr] = useState('');
@@ -112,18 +114,37 @@ export function ConsoleMaintenance() {
     setAuditDaysInput(String(c.audit_retention_days));
   }
 
+  async function loadInitial() {
+    setLoading(true);
+    setLoadErr('');
+    try {
+      const res = await api.adminGetMaintenance();
+      hydrate(res);
+      setLoaded(true);
+    } catch (error) {
+      setLoadErr(error instanceof ApiError ? error.message : 'Failed to load maintenance settings');
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    setErr('');
+    setLoadErr('');
     api
       .adminGetMaintenance()
       .then((res) => {
-        if (!cancelled) hydrate(res);
+        if (!cancelled) {
+          hydrate(res);
+          setLoaded(true);
+        }
       })
       .catch((error) => {
         if (!cancelled) {
-          setErr(error instanceof ApiError ? error.message : 'Failed to load maintenance settings');
+          setLoadErr(
+            error instanceof ApiError ? error.message : 'Failed to load maintenance settings',
+          );
         }
       })
       .finally(() => {
@@ -134,6 +155,24 @@ export function ConsoleMaintenance() {
     };
   }, []);
 
+  // Poll status while a background maintenance pass is running without overwriting unsaved draft edits.
+  useEffect(() => {
+    if (!status?.running) return;
+    let active = true;
+    const timer = window.setInterval(() => {
+      api
+        .adminGetMaintenance()
+        .then((res) => {
+          if (active) setStatus(res);
+        })
+        .catch(() => {});
+    }, 2000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [status?.running]);
+
   function clearFeedback() {
     if (feedback) setFeedback('');
     if (err) setErr('');
@@ -141,6 +180,7 @@ export function ConsoleMaintenance() {
 
   async function handleSave(e: FormEvent) {
     e.preventDefault();
+    if (!loaded) return;
     setErr('');
     setFeedback('');
 
@@ -149,20 +189,35 @@ export function ConsoleMaintenance() {
       setErr('Schedule interval must be between 1 and 720 hours.');
       return;
     }
-    const graceHours = Number.parseInt(graceInput.trim(), 10);
-    if (!Number.isFinite(graceHours) || graceHours < 1 || graceHours > 168) {
-      setErr('Artwork grace period must be between 1 and 168 hours.');
-      return;
+
+    let graceHours = cfg.artwork_grace_hours;
+    if (cfg.cleanup_orphaned_artwork) {
+      const parsed = Number.parseInt(graceInput.trim(), 10);
+      if (!Number.isFinite(parsed) || parsed < 1 || parsed > 168) {
+        setErr('Artwork grace period must be between 1 and 168 hours.');
+        return;
+      }
+      graceHours = parsed;
     }
-    const subDays = Number.parseInt(subDaysInput.trim(), 10);
-    if (!Number.isFinite(subDays) || subDays < 1 || subDays > 365) {
-      setErr('Extracted subtitle cache retention must be between 1 and 365 days.');
-      return;
+
+    let subDays = cfg.subtitle_cache_days;
+    if (cfg.cleanup_transcode_cache) {
+      const parsed = Number.parseInt(subDaysInput.trim(), 10);
+      if (!Number.isFinite(parsed) || parsed < 1 || parsed > 365) {
+        setErr('Extracted subtitle cache retention must be between 1 and 365 days.');
+        return;
+      }
+      subDays = parsed;
     }
-    const auditDays = Number.parseInt(auditDaysInput.trim(), 10);
-    if (!Number.isFinite(auditDays) || auditDays < 7 || auditDays > 3650) {
-      setErr('Audit log retention must be between 7 and 3650 days.');
-      return;
+
+    let auditDays = cfg.audit_retention_days;
+    if (cfg.prune_audit_logs) {
+      const parsed = Number.parseInt(auditDaysInput.trim(), 10);
+      if (!Number.isFinite(parsed) || parsed < 7 || parsed > 3650) {
+        setErr('Audit log retention must be between 7 and 3650 days.');
+        return;
+      }
+      auditDays = parsed;
     }
 
     const trimmedTime = useFixedTime ? scheduleTimeInput.trim() : '';
@@ -197,7 +252,8 @@ export function ConsoleMaintenance() {
     setRunningNow(true);
     try {
       const updated = await api.adminRunMaintenance();
-      hydrate(updated);
+      // Preserve any unsaved form draft edits; only refresh live status and last-run report.
+      setStatus(updated);
       setFeedback('Housekeeping pass completed.');
     } catch (error) {
       setErr(error instanceof ApiError ? error.message : 'Failed to run maintenance');
@@ -211,6 +267,25 @@ export function ConsoleMaintenance() {
       <div className="rounded-xl bg-surface border border-tone/[0.08] p-8 flex items-center justify-center gap-2 text-xs text-ink-secondary">
         <Loader2 className="w-4 h-4 animate-spin" />
         Loading maintenance settings…
+      </div>
+    );
+  }
+
+  if (!loaded) {
+    return (
+      <div className="rounded-xl bg-surface border border-danger/30 p-6 flex flex-col items-center justify-center gap-3 text-center">
+        <AlertTriangle className="w-5 h-5 text-danger" />
+        <div className="space-y-1">
+          <div className="text-sm font-semibold text-ink">Unable to load maintenance settings</div>
+          <p className="text-xs text-danger">{loadErr || 'Please check server connectivity and try again.'}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void loadInitial()}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-accent hover:bg-accent-hover text-on-accent text-xs font-semibold px-3.5 py-2 transition-colors cursor-pointer"
+        >
+          Retry
+        </button>
       </div>
     );
   }
