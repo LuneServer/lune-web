@@ -107,7 +107,7 @@ export function ConsoleOverview({
                     {health.database_ok ? 'SQLite WAL' : 'Database offline'}
                   </span>
                   <span className="text-ink-muted">·</span>
-                  <span className="text-ink">v{health.version}</span>
+                  <span className="text-ink">{health.version}</span>
                 </>
               ) : (
                 <span>Checking node…</span>
