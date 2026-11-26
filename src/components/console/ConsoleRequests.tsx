@@ -822,7 +822,7 @@ export function ConsoleRequests({
                                 <>
                                   <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                                   Connected to {testRes.app_name || service}{' '}
-                                  {testRes.version ? `v${testRes.version}` : ''}
+                                  {testRes.version ?? ''}
                                 </>
                               ) : (
                                 <>

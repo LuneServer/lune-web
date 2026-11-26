@@ -230,7 +230,7 @@ export function AuthScreen({ systemInfo, inviteToken, onClearInvite, onAuthentic
         )}
 
         <div className="mt-6 pt-5 border-t border-tone/[0.08] flex items-center justify-between text-[11px] tabular-nums text-ink-muted">
-          <span>v{systemInfo.version}</span>
+          <span>{systemInfo.version}</span>
           <span>edge: {systemInfo.edge_mode}</span>
         </div>
       </div>
