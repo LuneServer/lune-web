@@ -79,6 +79,7 @@ const VALID_CONSOLE_SECTIONS = new Set<ConsoleSection>([
   'invites',
   'playback',
   'network',
+  'maintenance',
   'activity',
 ]);
 
