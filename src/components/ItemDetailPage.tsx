@@ -20,11 +20,13 @@ import {
   Info,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Trash2,
 } from 'lucide-react';
 import {
   api,
   formatDuration,
+  formatResolution,
   type AudioTrack,
   type DiscoverFilter,
   type MediaItemDetail,
@@ -499,16 +501,7 @@ export function ItemDetailPage({
     : '';
   const imdbURL = detail?.imdb_id ? `https://www.imdb.com/title/${detail.imdb_id}/` : '';
 
-  const resLabel =
-    activeItem.video_height && activeItem.video_height >= 2000
-      ? '4K'
-      : activeItem.video_height && activeItem.video_height >= 1000
-        ? '1080p'
-        : activeItem.video_height && activeItem.video_height >= 700
-          ? '720p'
-          : activeItem.video_height
-            ? `${activeItem.video_height}p`
-            : '';
+  const resLabel = formatResolution(activeItem.video_width, activeItem.video_height, true);
 
   const similarItems = similar?.items ?? [];
   const similarSeries = similar?.series ?? [];
@@ -949,21 +942,24 @@ export function ItemDetailPage({
                       Audio
                     </span>
                     {audioTracks.length === 1 ? (
-                      <div className="rounded-lg bg-surface/70 border border-tone/[0.08] px-3 py-2 text-xs text-ink-secondary tabular-nums truncate">
-                        {formatAudioTrackLabel(audioTracks[0])}
+                      <div className="h-9 flex items-center rounded-lg bg-surface/70 border border-tone/[0.08] px-3 text-xs text-ink-secondary tabular-nums">
+                        <span className="truncate">{formatAudioTrackLabel(audioTracks[0])}</span>
                       </div>
                     ) : (
-                      <select
-                        value={selectedAudioIdx ?? audioTracks[0].index}
-                        onChange={(e) => setSelectedAudioIdx(Number(e.target.value))}
-                        className="rounded-lg bg-surface border border-hairline px-3 py-2 text-xs text-ink tabular-nums focus:outline-none focus:border-tone/45"
-                      >
-                        {audioTracks.map((tr) => (
-                          <option key={tr.index} value={tr.index}>
-                            {formatAudioTrackLabel(tr)}
-                          </option>
-                        ))}
-                      </select>
+                      <div className="relative">
+                        <select
+                          value={selectedAudioIdx ?? audioTracks[0].index}
+                          onChange={(e) => setSelectedAudioIdx(Number(e.target.value))}
+                          className="appearance-none w-full h-9 rounded-lg bg-surface/70 hover:bg-surface border border-tone/12 hover:border-tone/25 pl-3 pr-8 text-xs text-ink tabular-nums truncate focus:outline-none focus:border-tone/45 transition-colors cursor-pointer"
+                        >
+                          {audioTracks.map((tr) => (
+                            <option key={tr.index} value={tr.index}>
+                              {formatAudioTrackLabel(tr)}
+                            </option>
+                          ))}
+                        </select>
+                        <ChevronDown className="w-3.5 h-3.5 text-ink-muted pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2" />
+                      </div>
                     )}
                   </label>
                 )}
@@ -974,21 +970,24 @@ export function ItemDetailPage({
                       <Subtitles className="w-3 h-3" />
                       Subtitles
                     </span>
-                    <select
-                      value={selectedSubIdx === null ? '' : String(selectedSubIdx)}
-                      onChange={(e) =>
-                        setSelectedSubIdx(e.target.value === '' ? null : Number(e.target.value))
-                      }
-                      className="rounded-lg bg-surface border border-hairline px-3 py-2 text-xs text-ink tabular-nums focus:outline-none focus:border-tone/45"
-                    >
-                      <option value="">Off</option>
+                    <div className="relative">
+                      <select
+                        value={selectedSubIdx === null ? '' : String(selectedSubIdx)}
+                        onChange={(e) =>
+                          setSelectedSubIdx(e.target.value === '' ? null : Number(e.target.value))
+                        }
+                        className="appearance-none w-full h-9 rounded-lg bg-surface/70 hover:bg-surface border border-tone/12 hover:border-tone/25 pl-3 pr-8 text-xs text-ink tabular-nums truncate focus:outline-none focus:border-tone/45 transition-colors cursor-pointer"
+                      >
+                        <option value="">Off</option>
                       {subtitleTracks.map((sub) => (
                         <option key={sub.index} value={String(sub.index)}>
                           {sub.label}
                           {sub.format ? ` · ${sub.format === 'subrip' ? 'SRT' : sub.format.toUpperCase()}` : ''}
                         </option>
                       ))}
-                    </select>
+                      </select>
+                      <ChevronDown className="w-3.5 h-3.5 text-ink-muted pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2" />
+                    </div>
                   </label>
                 )}
               </div>

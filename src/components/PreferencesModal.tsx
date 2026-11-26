@@ -1,7 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { Languages, Sparkles, Subtitles, X, Check, ShieldCheck, Copy } from 'lucide-react';
+import { Languages, Sparkles, Subtitles, X, Check, ShieldCheck, Copy, Tags } from 'lucide-react';
 import { encode as encodeQR } from 'uqr';
-import { api, ApiError, type TOTPSetupResponse, type UserPreferences } from '../lib/api';
+import {
+  api,
+  ApiError,
+  type PosterBadge,
+  type TOTPSetupResponse,
+  type UserPreferences,
+} from '../lib/api';
+import { POSTER_BADGE_OPTIONS } from '../lib/posterBadges';
 import { useBodyScrollLock } from '../lib/useBodyScrollLock';
 import { ThemeSwitcher } from './ThemeSwitcher';
 
@@ -33,6 +40,7 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
   const [subsEnabled, setSubsEnabled] = useState(initialPrefs?.subtitles_enabled ?? false);
   const [autoplayNext, setAutoplayNext] = useState(initialPrefs?.autoplay_next ?? true);
   const [combineNextUp, setCombineNextUp] = useState(initialPrefs?.combine_next_up ?? true);
+  const [posterBadges, setPosterBadges] = useState<PosterBadge[]>(initialPrefs?.poster_badges ?? []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -73,6 +81,7 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
         setSubsEnabled(Boolean(profile.preferences.subtitles_enabled));
         setAutoplayNext(profile.preferences.autoplay_next ?? true);
         setCombineNextUp(profile.preferences.combine_next_up ?? true);
+        setPosterBadges(profile.preferences.poster_badges ?? []);
         setTotpEnabled(Boolean(profile.totp_enabled));
         setTotpRequired(Boolean(profile.totp_required));
       })
@@ -142,6 +151,7 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
         autoplay_next: autoplayNext,
         max_bitrate: initialPrefs?.max_bitrate,
         combine_next_up: combineNextUp,
+        poster_badges: posterBadges,
       };
       const updated = await api.updateUserProfile({
         display_name: name.trim() || displayName,
@@ -350,6 +360,57 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
                   }`}
                 />
               </button>
+            </div>
+
+            <div className="pt-2.5 border-t border-tone/[0.06] space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <div>
+                  <div className="text-xs font-medium text-ink flex items-center gap-1.5">
+                    <Tags className="w-3.5 h-3.5 text-ink-secondary" />
+                    Poster Badges
+                  </div>
+                  <div className="text-[11px] text-ink-muted">
+                    Choose which metadata pills appear over poster artwork. Default is none.
+                  </div>
+                </div>
+                {posterBadges.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setPosterBadges([])}
+                    className="text-[11px] text-ink-secondary hover:text-ink underline underline-offset-2 shrink-0 cursor-pointer"
+                  >
+                    Clear all
+                  </button>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {POSTER_BADGE_OPTIONS.map((opt) => {
+                  const active = posterBadges.includes(opt.id);
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() =>
+                        setPosterBadges((prev) =>
+                          prev.includes(opt.id)
+                            ? prev.filter((b) => b !== opt.id)
+                            : [...prev, opt.id],
+                        )
+                      }
+                      className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs transition-colors cursor-pointer ${
+                        active
+                          ? 'bg-tone/12 border-tone/40 text-ink font-medium'
+                          : 'bg-canvas/70 border-hairline text-ink-secondary hover:text-ink'
+                      }`}
+                    >
+                      {active && <Check className="w-3 h-3 text-ink shrink-0" />}
+                      <span>{opt.label}</span>
+                      <span className="text-[10px] text-ink-muted tabular-nums">{opt.example}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           </div>
 

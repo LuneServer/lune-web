@@ -47,8 +47,9 @@ lune-web/
     ├── tokens.css                    # Synced from lune-brand/tokens.css (--lune-* CSS variables for dark & light themes)
     ├── index.css                     # Tailwind v4 @import + @theme inline CSS-variable mappings + .lune-backdrop + theme mark switcher
     ├── lib/
-    │   ├── api.ts                    # Typed fetch client (with AbortSignal support), API DTO interfaces, ApiError, codec detection, formatters
+    │   ├── api.ts                    # Typed fetch client (with AbortSignal support), API DTO interfaces, ApiError, codec detection, formatters (including width+height-aware formatResolution)
     │   ├── cache.ts                  # Bounded in-memory Stale-While-Revalidate cache (libraries, Home, My List, per-view grids, item/series details, similar items) with epoch-based invalidation
+    │   ├── posterBadges.tsx          # React context & option registry for configurable poster overlay badges (default: none)
     │   └── theme.ts                  # Persistent Appearance hook (system default | light | dark in localStorage lune_theme_pref + matchMedia live sync + data-theme/theme-color)
     ├── App.tsx                       # App shell, session bootstrap, view state, frosted top nav with 3-way theme switcher, Home/Library/Search views
     └── components/
@@ -57,8 +58,8 @@ lune-web/
         ├── ThemeSwitcher.tsx         # 3-way Appearance selector (Auto/System, Light, Dark) used in header, AuthScreen, and PreferencesModal
         ├── AuthScreen.tsx            # First-run admin setup (/api/v1/setup), login (/api/v1/auth/login) with TOTP 2FA / recovery code step, and invite acceptance (/invite/:token)
         ├── TotpEnrollmentScreen.tsx  # Forced 2FA QR enrollment & recovery code screen when an admin enforces totp_required on a user or invite
-        ├── MediaCard.tsx             # 2:3 poster card with resolution/HDR/Dual Audio badges & continue-watching progress bar
-        ├── SeriesCard.tsx            # 2:3 TV/Anime series card with season/episode counts & Dual Audio badge
+        ├── MediaCard.tsx             # 2:3 poster card with configurable poster badges (default: none; resolution/HDR/Dual Audio/rating) & continue-watching progress bar
+        ├── SeriesCard.tsx            # 2:3 TV/Anime series card with configurable poster badges (default: none; seasons/resolution/HDR/Dual Audio/rating)
         ├── MediaListRow.tsx          # Horizontal list-view rows (MediaListRow & SeriesListRow) for Poster/List view switching
         ├── LibraryFilterBar.tsx      # Facet-driven library filter bar (genre, content rating, year, min rating, watched status, 4K/HDR/Dual Audio)
         ├── MediaShelf.tsx            # Horizontal scrolling home shelf with prev/next controls & edge fades
@@ -68,7 +69,7 @@ lune-web/
         ├── SeriesDetailPage.tsx      # Full-bleed series detail page: Anime/TV eyebrow, synopsis, watchlist/favorite/mark-watched toggles, admin cog (refresh/re-match series), clickable genres/studios/cast, season & Specials/OVAs tabs with bulk mark watched, episode list with progress, Next Up, and local More Like This shelf
         ├── ItemDetailPage.tsx        # Full-bleed item detail page: resume/start-over/watched state, pre-play audio & subtitle pickers, user ⋯ menu (Media Info, Download Original, Copy Stream URL, Reset Progress), admin ⚙ cog (Refresh & Re-Match), clickable series breadcrumb & Prev/Next + More from Season shelf, clickable chapters, clickable genres/credits/cast, and local More Like This shelf
         ├── TheaterPlayer.tsx         # Full-viewport player: Direct Play / hls.js, quality/audio/subtitle/speed menus, quick Sub/Dub toggle, Skip Opening/Ending/Recap pill & chapter ticks, embedded+sidecar WebVTT cue renderer, stats overlay, progress sync, Up Next countdown
-        ├── PreferencesModal.tsx      # User playback preferences modal: one-click Anime Subbed/Dubbed presets, default audio/subtitle language, subtitles toggle, autoplay next, combine Next Up toggle, and TOTP 2FA enrollment/recovery codes
+        ├── PreferencesModal.tsx      # User playback & UI preferences modal: one-click Anime Subbed/Dubbed presets, default audio/subtitle language, subtitles toggle, autoplay next, combine Next Up toggle, configurable poster badges (default: none), and TOTP 2FA enrollment/recovery codes
         ├── RequestsPage.tsx          # User-facing Media Requests & Discover page (/requests): TMDB discovery/search with Seerr-style filters (sort, genre, year, min score, language, Not in Library toggle), frosted request confirmation modal, My Requests & admin All Requests tabs (neutral App Store-compliant UX)
         ├── DevicePair.tsx            # RFC 8628 TV/mobile device pairing code approval
         ├── AdminConsole.tsx          # Category-routed admin console shell (/console, /console/libraries, /console/requests, /console/users, /console/invites, /console/playback, /console/network, /console/maintenance, /console/activity)

@@ -1,20 +1,13 @@
 import { Layers, Sparkles, Star, X } from 'lucide-react';
 import {
   formatDuration,
+  formatResolution,
   type MediaItemSummary,
   type PlaybackProgress,
   type SeriesSummary,
 } from '../lib/api';
 import { AppLink, itemPath, seriesPath } from './AppLink';
 import { LuneMark } from './LuneMark';
-
-function resolutionLabel(height?: number): string {
-  if (!height) return '';
-  if (height >= 2000) return '4K';
-  if (height >= 1000) return '1080p';
-  if (height >= 700) return '720p';
-  return '';
-}
 
 function hdrLabel(hdr?: string): string {
   return hdr && hdr !== 'sdr' ? hdr.toUpperCase() : '';
@@ -37,7 +30,7 @@ export function MediaListRow({
   onRemove,
   removeLabel = 'Remove',
 }: MediaListRowProps) {
-  const resBadge = resolutionLabel(item.video_height);
+  const resBadge = formatResolution(item.video_width, item.video_height);
   const hdrBadge = hdrLabel(item.video_hdr);
   const pct =
     progressPct !== undefined
@@ -162,7 +155,7 @@ interface SeriesListRowProps {
 
 export function SeriesListRow({ series, onSelect }: SeriesListRowProps) {
   const isAnime = series.library_kind === 'anime';
-  const resBadge = resolutionLabel(series.video_height);
+  const resBadge = formatResolution(series.video_width, series.video_height);
   const hdrBadge = hdrLabel(series.video_hdr);
   const summaryLine =
     series.overview ||
