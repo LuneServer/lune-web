@@ -237,6 +237,59 @@ export function RequestsPage({
     return discoverItems;
   }, [discoverItems, availability]);
 
+  // Keep poster grid rows evenly filled and consistent across "Load more" clicks.
+  const [posterGridEl, setPosterGridEl] = useState<HTMLDivElement | null>(null);
+  const [posterGridCols, setPosterGridCols] = useState(0);
+  const [posterBatches, setPosterBatches] = useState(1);
+
+  useEffect(() => {
+    if (!posterGridEl) return;
+    const measure = () => {
+      const cols = window
+        .getComputedStyle(posterGridEl)
+        .gridTemplateColumns.split(' ')
+        .filter((s) => s.trim() !== '' && s !== 'none').length;
+      if (cols > 0) setPosterGridCols(cols);
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', measure);
+      return () => window.removeEventListener('resize', measure);
+    }
+    const ro = new ResizeObserver(measure);
+    ro.observe(posterGridEl);
+    return () => ro.disconnect();
+  }, [posterGridEl]);
+
+  const rowsPerBatch = useMemo(() => {
+    if (posterGridCols >= 6) return 3;
+    if (posterGridCols === 5) return 4;
+    if (posterGridCols === 4) return 5;
+    if (posterGridCols === 3) return 6;
+    return 10;
+  }, [posterGridCols]);
+
+  const targetPosterCount =
+    posterGridCols > 1 ? posterBatches * rowsPerBatch * posterGridCols : filteredDiscoverItems.length;
+
+  const visiblePosterItems = useMemo(() => {
+    if (
+      posterGridCols <= 1 ||
+      (page >= totalPages && filteredDiscoverItems.length <= targetPosterCount)
+    ) {
+      return filteredDiscoverItems;
+    }
+    if (filteredDiscoverItems.length >= targetPosterCount) {
+      return filteredDiscoverItems.slice(0, targetPosterCount);
+    }
+    if (page >= totalPages || filteredDiscoverItems.length < posterGridCols) {
+      return filteredDiscoverItems;
+    }
+    const fullRowCount =
+      Math.floor(filteredDiscoverItems.length / posterGridCols) * posterGridCols;
+    return filteredDiscoverItems.slice(0, fullRowCount);
+  }, [filteredDiscoverItems, page, totalPages, posterGridCols, targetPosterCount]);
+
   function handleSelectDiscoverTab(nextTab: DiscoverTab) {
     setSearchInput('');
     setDebouncedQuery('');
@@ -437,11 +490,42 @@ export function RequestsPage({
 
   useEffect(() => {
     if (activeTab !== 'discover') return;
+    setPosterBatches(1);
     loadDiscover(1, false);
     return () => {
       searchAbortRef.current?.abort();
     };
   }, [activeTab, loadDiscover]);
+
+  // Top up the buffer automatically when a full batch needs one more TMDB page.
+  useEffect(() => {
+    if (
+      activeTab !== 'discover' ||
+      viewMode !== 'poster' ||
+      discoverLoading ||
+      loadingMore ||
+      discoverErr ||
+      posterGridCols <= 1 ||
+      page >= totalPages
+    ) {
+      return;
+    }
+    if (filteredDiscoverItems.length < targetPosterCount) {
+      loadDiscover(page + 1, true);
+    }
+  }, [
+    activeTab,
+    viewMode,
+    discoverLoading,
+    loadingMore,
+    discoverErr,
+    posterGridCols,
+    page,
+    totalPages,
+    filteredDiscoverItems.length,
+    targetPosterCount,
+    loadDiscover,
+  ]);
 
   // Fetch requests list
   const loadRequests = useCallback(
@@ -780,7 +864,7 @@ export function RequestsPage({
                   </button>
 
                   {datePopoverOpen && (
-                    <div className="absolute left-0 top-full mt-1.5 z-30 w-72 rounded-xl bg-surface/95 backdrop-blur-xl border border-tone/15 shadow-2xl p-3.5 space-y-3">
+                    <div className="fixed inset-x-4 top-1/2 -translate-y-1/2 sm:translate-y-0 sm:inset-x-auto sm:absolute sm:left-0 sm:top-full sm:mt-1.5 z-50 sm:z-30 sm:w-72 rounded-xl bg-surface/95 backdrop-blur-xl border border-tone/15 shadow-2xl p-3.5 space-y-3">
                       <div className="space-y-1.5">
                         <label className="block text-[10px] font-semibold uppercase tracking-wider text-ink-muted">
                           Calendar Timeframe
@@ -1013,7 +1097,7 @@ export function RequestsPage({
                     return (
                       <div
                         key={key}
-                        className="flex items-center gap-4 rounded-xl bg-surface/60 hover:bg-elevated/70 border border-tone/[0.08] px-3.5 py-2.5 transition-colors"
+                        className="flex flex-wrap sm:flex-nowrap items-center gap-3 sm:gap-4 rounded-xl bg-surface/60 hover:bg-elevated/70 border border-tone/[0.08] px-3 sm:px-3.5 py-2.5 transition-colors"
                       >
                         <button
                           type="button"
@@ -1108,8 +1192,8 @@ export function RequestsPage({
                   })}
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {filteredDiscoverItems.map((item) => {
+                <div ref={setPosterGridEl} className="lune-poster-grid">
+                {visiblePosterItems.map((item) => {
                   const key = `${item.media_type}:${item.tmdb_id}`;
                   const typeLabel = mediaTypeLabel(item.media_type, item.is_anime);
                   const canNavigate =
@@ -1227,12 +1311,19 @@ export function RequestsPage({
                 </div>
               )}
 
-              {page < totalPages && (
+              {(page < totalPages ||
+                (viewMode === 'poster' && visiblePosterItems.length < filteredDiscoverItems.length)) && (
                 <div className="flex justify-center pt-2">
                   <button
                     type="button"
                     disabled={loadingMore}
-                    onClick={() => loadDiscover(page + 1, true)}
+                    onClick={() => {
+                      if (viewMode === 'poster' && posterGridCols > 1) {
+                        setPosterBatches((b) => b + 1);
+                      } else {
+                        loadDiscover(page + 1, true);
+                      }
+                    }}
                     className="inline-flex items-center gap-2 rounded-xl bg-surface hover:bg-elevated border border-hairline px-5 py-2.5 text-xs font-medium text-ink transition-colors cursor-pointer disabled:opacity-50"
                   >
                     {loadingMore && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
@@ -1431,9 +1522,9 @@ export function RequestsPage({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-lg rounded-2xl bg-surface/92 backdrop-blur-xl backdrop-saturate-150 border border-tone/12 shadow-2xl overflow-hidden"
+            className="w-full max-w-lg max-h-[90dvh] overflow-y-auto rounded-2xl bg-surface/92 backdrop-blur-xl backdrop-saturate-150 border border-tone/12 shadow-2xl"
           >
-            <div className="px-6 pt-5 pb-4 border-b border-tone/[0.08] flex items-start justify-between gap-4">
+            <div className="px-4 sm:px-6 pt-4 sm:pt-5 pb-3.5 sm:pb-4 border-b border-tone/[0.08] flex items-start justify-between gap-4">
               <div>
                 <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-muted">
                   Request Title
@@ -1454,7 +1545,7 @@ export function RequestsPage({
               </button>
             </div>
 
-            <div className="p-6 space-y-5">
+            <div className="p-4 sm:p-6 space-y-5">
               <div className="flex gap-4 items-start">
                 <div className="w-24 shrink-0 aspect-[2/3] rounded-xl overflow-hidden bg-elevated border border-tone/[0.08] flex items-center justify-center">
                   {confirmItem.poster_url ? (

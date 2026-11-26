@@ -96,6 +96,17 @@ export function MediaListRow({
           {summaryLine && (
             <p className="text-xs text-ink-muted truncate">{summaryLine}</p>
           )}
+          <div className="flex sm:hidden flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] tabular-nums text-ink-muted">
+            {item.rating !== undefined && item.rating > 0 && (
+              <span className="inline-flex items-center gap-0.5 text-ink-secondary font-medium">
+                <Star className="w-2.5 h-2.5 fill-current" />
+                {item.rating.toFixed(1)}
+              </span>
+            )}
+            {item.duration_ms > 0 && <span>{formatDuration(item.duration_ms)}</span>}
+            {resBadge && <span>{resBadge}</span>}
+            {item.dual_audio && <span className="text-telemetry font-medium">DUAL</span>}
+          </div>
         </div>
 
         <div className="hidden sm:flex items-center gap-2.5 shrink-0 tabular-nums">
@@ -202,6 +213,19 @@ export function SeriesListRow({ series, onSelect }: SeriesListRowProps) {
         {summaryLine && (
           <p className="text-xs text-ink-muted truncate">{summaryLine}</p>
         )}
+        <div className="flex sm:hidden flex-wrap items-center gap-x-2 gap-y-0.5 text-[11px] tabular-nums text-ink-muted">
+          {series.rating !== undefined && series.rating > 0 && (
+            <span className="inline-flex items-center gap-0.5 text-ink-secondary font-medium">
+              <Star className="w-2.5 h-2.5 fill-current" />
+              {series.rating.toFixed(1)}
+            </span>
+          )}
+          <span>
+            {series.season_count}S · {series.episode_count} {series.episode_count === 1 ? 'ep' : 'eps'}
+          </span>
+          {resBadge && <span>{resBadge}</span>}
+          {series.dual_audio && <span className="text-telemetry font-medium">DUAL</span>}
+        </div>
       </div>
 
       <div className="hidden sm:flex items-center gap-2.5 shrink-0 tabular-nums">

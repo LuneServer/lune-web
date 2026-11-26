@@ -18,6 +18,8 @@ import {
   Inbox,
   LayoutGrid,
   List,
+  Menu,
+  X,
 } from 'lucide-react';
 import { useTheme } from './lib/theme';
 import { LuneMark } from './components/LuneMark';
@@ -342,8 +344,36 @@ export function App() {
   const [animeFilter, setAnimeFilter] = useState<'all' | 'series' | 'movies'>('all');
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [showPrefs, setShowPrefs] = useState(false);
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const mobileSearchInputRef = useRef<HTMLInputElement>(null);
 
   const [detailRefreshKey, setDetailRefreshKey] = useState(0);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const onPointerDown = (e: MouseEvent) => {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
+        setMobileMenuOpen(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setMobileMenuOpen(false);
+    };
+    window.addEventListener('mousedown', onPointerDown);
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('mousedown', onPointerDown);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [mobileMenuOpen]);
+
+  useEffect(() => {
+    if (mobileSearchOpen) {
+      mobileSearchInputRef.current?.focus();
+    }
+  }, [mobileSearchOpen]);
 
   // Per-history-entry scroll position map for instant Back/Forward restoration
   const scrollPositionsRef = useRef<Map<number, number>>(new Map());
@@ -384,6 +414,8 @@ export function App() {
       setHistoryDepth((d) => d + 1);
     }
     setSearch('');
+    setMobileSearchOpen(false);
+    setMobileMenuOpen(false);
     setAnimeFilter('all');
     setFavoritesOnly(false);
     setFilters({});
@@ -956,104 +988,138 @@ export function App() {
   const requestsEnabled = Boolean(systemInfo.requests_enabled);
   const canAccessRequests = requestsEnabled && (user.role === 'admin' || user.can_request !== false);
 
+  const canSearchView = view.kind === 'home' || view.kind === 'library';
+  const showMobileSearchBar = canSearchView && (mobileSearchOpen || search.trim() !== '');
+
+  const navLinks = (
+    <>
+      <AppLink
+        href="/"
+        onNavigate={() => navigateTo({ kind: 'home' })}
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
+          view.kind === 'home'
+            ? 'bg-tone/12 text-ink'
+            : 'text-ink-secondary hover:text-ink'
+        }`}
+      >
+        <Home className="w-3.5 h-3.5" />
+        Home
+      </AppLink>
+
+      <AppLink
+        href="/my-list"
+        onNavigate={() => navigateTo({ kind: 'mylist', tab: 'watchlist' })}
+        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
+          view.kind === 'mylist'
+            ? 'bg-tone/12 text-ink'
+            : 'text-ink-secondary hover:text-ink'
+        }`}
+      >
+        <Bookmark className="w-3.5 h-3.5" />
+        My List
+      </AppLink>
+
+      {libraries.map((lib) => {
+        const isActive = activeNavLibId === lib.id;
+        return (
+          <AppLink
+            key={lib.id}
+            href={libraryPath(lib.id)}
+            onNavigate={() => navigateTo({ kind: 'library', libraryId: lib.id })}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
+              isActive
+                ? 'bg-tone/12 text-ink'
+                : 'text-ink-secondary hover:text-ink'
+            }`}
+          >
+            <LibraryIcon kind={lib.kind} />
+            {lib.name}
+          </AppLink>
+        );
+      })}
+
+      {canAccessRequests && (
+        <AppLink
+          href="/requests"
+          onNavigate={() => navigateTo({ kind: 'requests' })}
+          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors cursor-pointer shrink-0 ${
+            view.kind === 'requests'
+              ? 'bg-tone/12 text-ink'
+              : 'text-ink-secondary hover:text-ink'
+          }`}
+        >
+          <Inbox className="w-3.5 h-3.5" />
+          Requests
+        </AppLink>
+      )}
+    </>
+  );
+
   return (
     <PosterBadgesContext.Provider value={user.preferences?.poster_badges ?? []}>
-    <div className="lune-backdrop min-h-screen flex flex-col">
+    <div className="lune-backdrop min-h-dvh flex flex-col">
       {/* Top Navigation — stays visible above both detail pages and the enlarged theater player */}
-      <header className="sticky top-0 z-50 bg-canvas/75 backdrop-blur-xl backdrop-saturate-150 border-b border-tone/[0.08]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-5 min-w-0">
+      <header className="sticky top-0 z-50 bg-canvas/80 backdrop-blur-xl backdrop-saturate-150 border-b border-tone/[0.08]">
+        <div className="max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-3 sm:gap-4">
+          <div className="flex items-center gap-4 lg:gap-5 min-w-0">
             <AppLink
               href="/"
               onNavigate={() => navigateTo({ kind: 'home' })}
-              className="flex items-center gap-2.5 shrink-0 cursor-pointer"
+              className="flex items-center gap-2 sm:gap-2.5 shrink-0 cursor-pointer"
             >
               <LuneMark alt="Lune" className="w-7 h-7" />
-              <span className="text-lg font-semibold tracking-tight text-ink">Lune</span>
+              <span className="text-base sm:text-lg font-semibold tracking-tight text-ink">Lune</span>
             </AppLink>
 
-            <nav className="flex items-center gap-1 overflow-x-auto no-scrollbar">
-              <AppLink
-                href="/"
-                onNavigate={() => navigateTo({ kind: 'home' })}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
-                  view.kind === 'home'
-                    ? 'bg-tone/12 text-ink'
-                    : 'text-ink-secondary hover:text-ink'
-                }`}
-              >
-                <Home className="w-3.5 h-3.5" />
-                Home
-              </AppLink>
-
-              <AppLink
-                href="/my-list"
-                onNavigate={() => navigateTo({ kind: 'mylist', tab: 'watchlist' })}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
-                  view.kind === 'mylist'
-                    ? 'bg-tone/12 text-ink'
-                    : 'text-ink-secondary hover:text-ink'
-                }`}
-              >
-                <Bookmark className="w-3.5 h-3.5" />
-                My List
-              </AppLink>
-
-              {libraries.map((lib) => {
-                const isActive = activeNavLibId === lib.id;
-                return (
-                  <AppLink
-                    key={lib.id}
-                    href={libraryPath(lib.id)}
-                    onNavigate={() => navigateTo({ kind: 'library', libraryId: lib.id })}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
-                      isActive
-                        ? 'bg-tone/12 text-ink'
-                        : 'text-ink-secondary hover:text-ink'
-                    }`}
-                  >
-                    <LibraryIcon kind={lib.kind} />
-                    {lib.name}
-                  </AppLink>
-                );
-              })}
-
-              {canAccessRequests && (
-                <AppLink
-                  href="/requests"
-                  onNavigate={() => navigateTo({ kind: 'requests' })}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
-                    view.kind === 'requests'
-                      ? 'bg-tone/12 text-ink'
-                      : 'text-ink-secondary hover:text-ink'
-                  }`}
-                >
-                  <Inbox className="w-3.5 h-3.5" />
-                  Requests
-                </AppLink>
-              )}
+            <nav className="hidden md:flex items-center gap-1 overflow-x-auto no-scrollbar">
+              {navLinks}
             </nav>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
-            {(view.kind === 'home' || view.kind === 'library') && (
-              <div className="relative hidden md:block">
-                <Search className="w-3.5 h-3.5 text-ink-muted absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="search"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder={activeLibrary ? `Search ${activeLibrary.name}…` : 'Search everything…'}
-                  className="w-48 rounded-full bg-surface border border-tone/10 pl-8 pr-3 py-1.5 text-xs text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/35 transition-colors"
-                />
-              </div>
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {canSearchView && (
+              <>
+                <div className="relative hidden md:block">
+                  <Search className="w-3.5 h-3.5 text-ink-muted absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="search"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder={activeLibrary ? `Search ${activeLibrary.name}…` : 'Search everything…'}
+                    className="w-44 lg:w-56 xl:w-64 rounded-full bg-surface border border-tone/10 pl-8 pr-3 py-1.5 text-xs text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/35 transition-colors"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  aria-label={showMobileSearchBar ? 'Close search' : 'Search library'}
+                  aria-expanded={showMobileSearchBar}
+                  onClick={() => {
+                    if (showMobileSearchBar) {
+                      setSearch('');
+                      setMobileSearchOpen(false);
+                    } else {
+                      setMobileMenuOpen(false);
+                      setMobileSearchOpen(true);
+                    }
+                  }}
+                  className={`md:hidden inline-flex items-center justify-center w-9 h-9 rounded-full transition-colors cursor-pointer ${
+                    showMobileSearchBar
+                      ? 'bg-tone/12 text-ink'
+                      : 'text-ink-secondary hover:text-ink hover:bg-surface'
+                  }`}
+                >
+                  {showMobileSearchBar ? <X className="w-4 h-4" /> : <Search className="w-4 h-4" />}
+                </button>
+              </>
             )}
 
+            {/* Desktop & Tablet Utility Controls (sm+) */}
             <AppLink
               href="/pair"
               title="Pair TV or Mobile Device"
               onNavigate={() => navigateTo({ kind: 'pair' })}
-              className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
+              className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
                 view.kind === 'pair'
                   ? 'bg-tone/12 text-ink'
                   : 'text-ink-secondary hover:text-ink hover:bg-surface'
@@ -1068,7 +1134,7 @@ export function App() {
                 href="/console"
                 title="Admin Console"
                 onNavigate={() => navigateTo({ kind: 'console', section: 'overview' })}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
+                className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-medium transition-colors cursor-pointer ${
                   view.kind === 'console'
                     ? 'bg-tone/12 text-ink'
                     : 'text-ink-secondary hover:text-ink hover:bg-surface'
@@ -1079,7 +1145,7 @@ export function App() {
               </AppLink>
             )}
 
-            <div className="flex items-center gap-1.5 pl-2 border-l border-tone/[0.08]">
+            <div className="hidden sm:flex items-center gap-1.5 pl-2 border-l border-tone/[0.08]">
               <ThemeSwitcher variant="compact" />
               <button
                 type="button"
@@ -1099,8 +1165,128 @@ export function App() {
                 <LogOut className="w-4 h-4" />
               </button>
             </div>
+
+            {/* Mobile Overflow / Account Menu (< sm) */}
+            <div ref={mobileMenuRef} className="relative sm:hidden">
+              <button
+                type="button"
+                aria-label="Open menu"
+                aria-expanded={mobileMenuOpen}
+                onClick={() => setMobileMenuOpen((v) => !v)}
+                className={`inline-flex items-center justify-center w-9 h-9 rounded-full transition-colors cursor-pointer ${
+                  mobileMenuOpen
+                    ? 'bg-tone/12 text-ink'
+                    : 'text-ink-secondary hover:text-ink hover:bg-surface'
+                }`}
+              >
+                {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+              </button>
+
+              {mobileMenuOpen && (
+                <div className="absolute right-0 top-11 z-50 w-72 max-w-[calc(100vw-2rem)] rounded-2xl bg-surface/95 backdrop-blur-xl backdrop-saturate-150 border border-tone/12 shadow-2xl p-2 space-y-1">
+                  <div className="px-2.5 py-1.5 border-b border-tone/[0.08] mb-1">
+                    <div className="text-xs font-semibold text-ink truncate">{user.display_name}</div>
+                    <div className="text-[11px] text-ink-muted truncate">@{user.username}</div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      setShowPrefs(true);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-medium text-ink hover:bg-tone/10 transition-colors cursor-pointer"
+                  >
+                    <SlidersHorizontal className="w-4 h-4 text-ink-secondary" />
+                    Preferences
+                  </button>
+
+                  <AppLink
+                    href="/pair"
+                    onNavigate={() => navigateTo({ kind: 'pair' })}
+                    className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
+                      view.kind === 'pair'
+                        ? 'bg-tone/12 text-ink'
+                        : 'text-ink hover:bg-tone/10'
+                    }`}
+                  >
+                    <Smartphone className="w-4 h-4 text-ink-secondary" />
+                    Pair Device
+                  </AppLink>
+
+                  {user.role === 'admin' && (
+                    <AppLink
+                      href="/console"
+                      onNavigate={() => navigateTo({ kind: 'console', section: 'overview' })}
+                      className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer ${
+                        view.kind === 'console'
+                          ? 'bg-tone/12 text-ink'
+                          : 'text-ink hover:bg-tone/10'
+                      }`}
+                    >
+                      <Settings2 className="w-4 h-4 text-ink-secondary" />
+                      Admin Console
+                    </AppLink>
+                  )}
+
+                  <div className="px-2.5 py-2 border-y border-tone/[0.08] my-1 space-y-2">
+                    <div className="text-[11px] font-medium text-ink-secondary">Theme</div>
+                    <ThemeSwitcher variant="labeled" fullWidth />
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      handleLogout();
+                    }}
+                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl text-xs font-medium text-danger hover:bg-danger/10 transition-colors cursor-pointer"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Sign out
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
+
+        {/* Expandable Mobile Search Bar (< md) */}
+        {showMobileSearchBar && (
+          <div className="md:hidden px-4 pb-3">
+            <div className="relative">
+              <Search className="w-4 h-4 text-ink-muted absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                ref={mobileSearchInputRef}
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={activeLibrary ? `Search ${activeLibrary.name}…` : 'Search everything…'}
+                className="w-full rounded-xl bg-surface border border-tone/12 pl-10 pr-9 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/40 transition-colors"
+              />
+              {search && (
+                <button
+                  type="button"
+                  aria-label="Clear search"
+                  onClick={() => setSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-full text-ink-muted hover:text-ink cursor-pointer"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Mobile Scrollable Primary Navigation Bar (< md, hidden during playback) */}
+        {!isWatchView && (
+          <nav
+            aria-label="Primary navigation"
+            className="md:hidden border-t border-tone/[0.06] px-4 py-2 flex items-center gap-1.5 overflow-x-auto no-scrollbar"
+          >
+            {navLinks}
+          </nav>
+        )}
       </header>
 
       {/* Full-Bleed Detail Pages (Item / Series) */}
@@ -1149,7 +1335,7 @@ export function App() {
         </main>
       ) : (
         /* Standard Padded Container Views */
-        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-8">
+        <main className="flex-1 max-w-[1600px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-8">
           {view.kind === 'console' && user.role === 'admin' && (
             <AdminConsole
               section={view.section}
@@ -1255,7 +1441,7 @@ export function App() {
                   ))}
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-4">
+                <div className="lune-poster-grid">
                   {libSeries.map((s) => (
                     <SeriesCard
                       key={`${s.library_id}:${s.title}`}
@@ -1564,7 +1750,7 @@ export function App() {
                   ))}
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-4">
+                <div className="lune-poster-grid">
                   {(view.tab === 'favorites' ? favoriteItems : watchlistItems).map((item) => (
                     <MediaCard
                       key={item.id}
@@ -1653,7 +1839,7 @@ export function App() {
                   ))}
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-4">
+                <div className="lune-poster-grid">
                   {libSeries.map((s) => (
                     <SeriesCard
                       key={`${s.library_id}:${s.title}`}
@@ -1756,7 +1942,7 @@ export function App() {
                   ))}
                 </div>
               ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-4">
+                <div className="lune-poster-grid">
                   {libSeries.map((s) => (
                     <SeriesCard
                       key={`${s.library_id}:${s.title}`}
@@ -1950,7 +2136,7 @@ export function App() {
                 }
 
                 return (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-4">
+                  <div className="lune-poster-grid">
                     {visibleSeries.map((s) => (
                       <SeriesCard
                         key={`${s.library_id}:${s.title}`}

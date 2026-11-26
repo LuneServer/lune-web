@@ -64,8 +64,8 @@ export function TotpEnrollmentScreen({ user, onCompleted, onSignOut }: Props) {
   }
 
   return (
-    <div className="lune-backdrop min-h-screen flex items-center justify-center p-6 relative">
-      <div className="absolute top-5 right-5 flex items-center gap-2">
+    <div className="lune-backdrop min-h-dvh flex flex-col p-4 sm:p-6">
+      <div className="flex flex-wrap items-center justify-end gap-2 mb-4">
         <ThemeSwitcher variant="labeled" />
         <button
           type="button"
@@ -77,7 +77,8 @@ export function TotpEnrollmentScreen({ user, onCompleted, onSignOut }: Props) {
         </button>
       </div>
 
-      <div className="w-full max-w-md rounded-2xl bg-surface/85 backdrop-blur-xl backdrop-saturate-150 border border-tone/10 p-7 shadow-[0_20px_60px_rgba(0,0,0,0.35)] space-y-5">
+      <div className="flex-1 flex items-center justify-center">
+      <div className="w-full max-w-md rounded-2xl bg-surface/85 backdrop-blur-xl backdrop-saturate-150 border border-tone/10 p-5 sm:p-7 shadow-[0_20px_60px_rgba(0,0,0,0.35)] space-y-5">
         <div className="flex flex-col items-center text-center">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-elevated to-canvas border border-tone/12 flex items-center justify-center shadow-lg mb-3">
             <LuneMark alt="Lune" className="w-9 h-9" />
@@ -239,6 +240,7 @@ export function TotpEnrollmentScreen({ user, onCompleted, onSignOut }: Props) {
             </button>
           </form>
         )}
+      </div>
       </div>
     </div>
   );

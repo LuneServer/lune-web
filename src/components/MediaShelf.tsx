@@ -71,7 +71,7 @@ export function MediaShelf({ header, children, itemCount }: Props) {
         <div
           ref={trackRef}
           onScroll={updateScrollState}
-          className="flex gap-4 sm:gap-5 overflow-x-auto no-scrollbar scroll-smooth snap-x snap-proximity py-1.5 -my-1.5"
+          className="flex gap-3 sm:gap-4 lg:gap-5 overflow-x-auto no-scrollbar scroll-smooth snap-x snap-proximity py-1.5 -my-1.5"
         >
           {children}
         </div>
@@ -79,13 +79,13 @@ export function MediaShelf({ header, children, itemCount }: Props) {
         {/* Edge fade cues indicating additional off-screen items */}
         <div
           aria-hidden="true"
-          className={`pointer-events-none absolute inset-y-0 left-0 w-10 bg-gradient-to-r from-canvas to-transparent transition-opacity duration-200 ${
+          className={`pointer-events-none absolute inset-y-0 left-0 w-6 sm:w-10 bg-gradient-to-r from-canvas to-transparent transition-opacity duration-200 ${
             canScrollLeft ? 'opacity-100' : 'opacity-0'
           }`}
         />
         <div
           aria-hidden="true"
-          className={`pointer-events-none absolute inset-y-0 right-0 w-12 bg-gradient-to-l from-canvas to-transparent transition-opacity duration-200 ${
+          className={`pointer-events-none absolute inset-y-0 right-0 w-8 sm:w-12 bg-gradient-to-l from-canvas to-transparent transition-opacity duration-200 ${
             canScrollRight ? 'opacity-100' : 'opacity-0'
           }`}
         />
@@ -94,4 +94,4 @@ export function MediaShelf({ header, children, itemCount }: Props) {
   );
 }
 
-export const SHELF_CARD_CLASS = 'w-[156px] sm:w-[176px] md:w-[192px] lg:w-[200px] shrink-0 snap-start';
+export const SHELF_CARD_CLASS = 'w-[136px] sm:w-[164px] md:w-[180px] lg:w-[196px] shrink-0 snap-start';

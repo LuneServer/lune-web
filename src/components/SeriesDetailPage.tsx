@@ -312,7 +312,7 @@ export function SeriesDetailPage({
   return (
     <div className="relative">
       {/* Full-bleed Atmospheric Series Backdrop */}
-      <div className="relative h-[38vh] min-h-[280px] sm:h-[48vh] sm:min-h-[380px] sm:max-h-[540px] w-full overflow-hidden">
+      <div className="relative h-[34vh] min-h-[240px] sm:h-[46vh] sm:min-h-[360px] sm:max-h-[540px] w-full overflow-hidden">
         {backdropURL ? (
           <img
             src={backdropURL}
@@ -326,7 +326,7 @@ export function SeriesDetailPage({
         <div className="absolute inset-0 bg-gradient-to-b from-canvas/45 via-transparent via-25% to-transparent" />
         <div className="absolute inset-0 bg-gradient-to-r from-canvas/75 via-transparent via-45% to-canvas/30" />
 
-        <div className="absolute top-6 inset-x-0 max-w-7xl mx-auto px-4 sm:px-6">
+        <div className="absolute top-4 sm:top-6 inset-x-0 max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8">
           <button
             type="button"
             onClick={onBack}
@@ -339,9 +339,9 @@ export function SeriesDetailPage({
       </div>
 
       {/* Main Content */}
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 -mt-36 sm:-mt-56 pb-16 space-y-10">
-        <div className="flex flex-col sm:flex-row gap-8 items-start">
-          <div className="w-40 sm:w-52 shrink-0 aspect-[2/3] rounded-2xl overflow-hidden bg-surface border border-tone/12 shadow-[0_20px_50px_rgba(0,0,0,0.35)] flex items-center justify-center">
+      <div className="relative max-w-[1600px] mx-auto px-4 sm:px-6 lg:px-8 -mt-28 sm:-mt-52 pb-16 space-y-8 sm:space-y-10">
+        <div className="flex flex-col sm:flex-row gap-5 sm:gap-8 items-start">
+          <div className="w-36 sm:w-48 lg:w-52 shrink-0 aspect-[2/3] rounded-2xl overflow-hidden bg-surface border border-tone/12 shadow-[0_20px_50px_rgba(0,0,0,0.35)] flex items-center justify-center">
             {posterURL ? (
               <img src={posterURL} alt={displayTitle} className="w-full h-full object-cover" />
             ) : (
@@ -359,7 +359,7 @@ export function SeriesDetailPage({
                 {isAnime && <Sparkles className="w-3.5 h-3.5" />}
                 {isAnime ? 'Anime Series' : 'Series'}
               </div>
-              <h1 className="text-3xl sm:text-4xl font-semibold text-ink tracking-tight">
+              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-semibold text-ink tracking-tight break-words">
                 {displayTitle}
               </h1>
               {originalTitle && originalTitle !== displayTitle && (
@@ -467,10 +467,10 @@ export function SeriesDetailPage({
                 <button
                   type="button"
                   onClick={() => onPlayEpisode(detail.next_up!)}
-                  className="inline-flex items-center gap-2 rounded-xl bg-accent hover:bg-accent-hover text-on-accent font-semibold text-sm px-6 py-3 shadow-md transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-2 max-w-full rounded-xl bg-accent hover:bg-accent-hover text-on-accent font-semibold text-sm px-5 sm:px-6 py-3 shadow-md transition-colors cursor-pointer"
                 >
-                  <Play className="w-4 h-4 fill-current" />
-                  Play Next Up · {nextUpLabel}
+                  <Play className="w-4 h-4 fill-current shrink-0" />
+                  <span className="truncate">Play Next Up · {nextUpLabel}</span>
                 </button>
               )}
 
@@ -543,7 +543,7 @@ export function SeriesDetailPage({
                   </button>
 
                   {showAdminMenu && (
-                    <div className="absolute left-0 sm:right-0 sm:left-auto top-12 z-30 w-56 rounded-xl bg-surface/92 backdrop-blur-xl backdrop-saturate-150 border border-tone/12 shadow-2xl p-1.5 space-y-0.5">
+                    <div className="fixed inset-x-4 bottom-4 sm:inset-x-auto sm:bottom-auto sm:absolute sm:right-0 sm:top-12 z-50 sm:z-30 sm:w-56 rounded-xl bg-surface/95 backdrop-blur-xl backdrop-saturate-150 border border-tone/12 shadow-2xl p-1.5 space-y-0.5">
                       <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-muted">
                         Admin Options
                       </div>
@@ -613,13 +613,13 @@ export function SeriesDetailPage({
           ) : (
             <>
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-2 overflow-x-auto no-scrollbar max-w-full pb-0.5">
                   {detail.seasons.map((s) => (
                     <button
                       key={s.season_number}
                       type="button"
                       onClick={() => setSelectedSeason(s.season_number)}
-                      className={`px-4 py-2 rounded-full text-xs font-medium border transition-colors cursor-pointer ${
+                      className={`px-3.5 sm:px-4 py-2 rounded-full text-xs font-medium whitespace-nowrap shrink-0 border transition-colors cursor-pointer ${
                         activeSeason?.season_number === s.season_number
                           ? 'bg-tone/12 border-tone/35 text-ink'
                           : 'bg-surface border-tone/[0.08] text-ink-secondary hover:text-ink'

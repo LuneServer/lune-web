@@ -86,12 +86,13 @@ export function AuthScreen({ systemInfo, inviteToken, onClearInvite, onAuthentic
   }
 
   return (
-    <div className="lune-backdrop min-h-screen flex items-center justify-center p-6 relative">
-      <div className="absolute top-5 right-5">
+    <div className="lune-backdrop min-h-dvh flex flex-col p-4 sm:p-6">
+      <div className="flex justify-end mb-4">
         <ThemeSwitcher variant="labeled" />
       </div>
 
-      <div className="w-full max-w-md rounded-2xl bg-surface/80 backdrop-blur-xl backdrop-saturate-150 border border-tone/10 p-8 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
+      <div className="flex-1 flex items-center justify-center">
+      <div className="w-full max-w-md rounded-2xl bg-surface/80 backdrop-blur-xl backdrop-saturate-150 border border-tone/10 p-6 sm:p-8 shadow-[0_20px_60px_rgba(0,0,0,0.35)]">
         <div className="flex flex-col items-center text-center mb-8">
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-elevated to-canvas border border-tone/12 flex items-center justify-center shadow-lg mb-4">
             <LuneMark alt="Lune" className="w-11 h-11" />
@@ -233,6 +234,7 @@ export function AuthScreen({ systemInfo, inviteToken, onClearInvite, onAuthentic
           <span>{systemInfo.version}</span>
           <span>edge: {systemInfo.edge_mode}</span>
         </div>
+      </div>
       </div>
     </div>
   );

@@ -173,7 +173,7 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md max-h-[90vh] overflow-y-auto rounded-2xl bg-surface/88 backdrop-blur-xl backdrop-saturate-150 border border-tone/12 shadow-2xl p-6 space-y-5"
+        className="w-full max-w-md max-h-[90dvh] overflow-y-auto rounded-2xl bg-surface/88 backdrop-blur-xl backdrop-saturate-150 border border-tone/12 shadow-2xl p-4 sm:p-6 space-y-5"
       >
         <div className="flex items-center justify-between">
           <div>
@@ -192,7 +192,7 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
         </div>
 
         {/* Appearance */}
-        <div className="flex items-center justify-between gap-3 pb-4 border-b border-tone/[0.08]">
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-tone/[0.08]">
           <div>
             <div className="text-xs font-medium text-ink">Appearance</div>
             <div className="text-[11px] text-ink-muted">Match device setting, Light, or Dark.</div>
@@ -212,7 +212,7 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
               original audio for movies/TV and plays anime in Japanese with English subs.
             </p>
           </div>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => {

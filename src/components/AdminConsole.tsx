@@ -301,7 +301,7 @@ export function AdminConsole({
 
       {/* Category Sidebar + Active Panel */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        <aside className="lg:col-span-3">
+        <aside className="lg:col-span-3 min-w-0">
           <nav
             aria-label="Console categories"
             className="flex lg:flex-col gap-1 overflow-x-auto no-scrollbar rounded-xl bg-surface/80 backdrop-blur-md border border-tone/[0.08] p-1.5"

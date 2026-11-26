@@ -45,13 +45,13 @@ lune-web/
 └── src/
     ├── main.tsx                      # React root mount
     ├── tokens.css                    # Synced from lune-brand/tokens.css (--lune-* CSS variables for dark & light themes)
-    ├── index.css                     # Tailwind v4 @import + @theme inline CSS-variable mappings + .lune-backdrop + theme mark switcher
+    ├── index.css                     # Tailwind v4 @import + @theme inline CSS-variable mappings + .lune-backdrop + .lune-poster-grid fluid auto-fill grid + theme mark switcher
     ├── lib/
     │   ├── api.ts                    # Typed fetch client (with AbortSignal support), API DTO interfaces, ApiError, codec detection, formatters (including width+height-aware formatResolution)
     │   ├── cache.ts                  # Bounded in-memory Stale-While-Revalidate cache (libraries, Home, My List, per-view grids, item/series details, similar items) with epoch-based invalidation
     │   ├── posterBadges.tsx          # React context & option registry for configurable poster overlay badges (default: none)
     │   └── theme.ts                  # Persistent Appearance hook (system default | light | dark in localStorage lune_theme_pref + matchMedia live sync + data-theme/theme-color)
-    ├── App.tsx                       # App shell, session bootstrap, view state, frosted top nav with 3-way theme switcher, Home/Library/Search views
+    ├── App.tsx                       # App shell, session bootstrap, view state, responsive frosted top nav (desktop single-row + mobile scrollable nav strip, expandable search, and overflow account menu), Home/Library/Search views
     └── components/
         ├── AppLink.tsx               # Semantic SPA <a href> wrapper + route path helpers (enables native Right-Click -> Open in New Tab, Cmd/Middle-Click, and Copy Link)
         ├── LuneMark.tsx              # Theme-adaptive Horizon logo switcher (dark/light SVG)

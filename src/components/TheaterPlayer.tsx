@@ -1581,7 +1581,7 @@ export function TheaterPlayer({
       data-theme="dark"
       onMouseMove={wakeOSD}
       className={`fixed inset-x-0 bottom-0 z-40 bg-black flex flex-col select-none ${
-        isFullscreen ? 'top-0' : 'top-16'
+        isFullscreen ? 'top-0' : 'top-14 sm:top-16'
       } ${!osdVisible && playing ? 'cursor-none' : ''}`}
     >
       {/* Video Stage */}
@@ -1591,6 +1591,8 @@ export function TheaterPlayer({
         onClick={() => {
           if (openMenu !== 'none') {
             setOpenMenu('none');
+          } else if (!osdVisible) {
+            wakeOSD();
           } else {
             togglePlay();
           }
@@ -1660,7 +1662,7 @@ export function TheaterPlayer({
         {showStats && plan && (
           <div
             onClick={(e) => e.stopPropagation()}
-            className="absolute top-16 right-5 w-80 rounded-xl bg-canvas/82 backdrop-blur-xl backdrop-saturate-150 border border-white/14 p-4 tabular-nums text-[11px] text-ink-secondary space-y-1.5 shadow-2xl"
+            className="absolute top-14 sm:top-16 right-3 sm:right-5 w-[min(20rem,calc(100vw-1.5rem))] max-h-[calc(100%-8rem)] overflow-y-auto rounded-xl bg-canvas/82 backdrop-blur-xl backdrop-saturate-150 border border-white/14 p-4 tabular-nums text-[11px] text-ink-secondary space-y-1.5 shadow-2xl"
           >
             <div className="flex items-center justify-between text-ink font-semibold pb-1 border-b border-white/[0.08]">
               <span>Playback Telemetry</span>
@@ -1765,12 +1767,12 @@ export function TheaterPlayer({
         {activeSkipChapter && upNextCountdown === null && (
           <div
             onClick={(e) => e.stopPropagation()}
-            className={`absolute right-6 transition-all duration-200 ${osdVisible ? 'bottom-28' : 'bottom-10'}`}
+            className={`absolute right-3 sm:right-6 transition-all duration-200 ${osdVisible ? 'bottom-28' : 'bottom-10'}`}
           >
             <button
               type="button"
               onClick={skipActiveChapter}
-              className="inline-flex items-center gap-2 rounded-xl bg-canvas/75 hover:bg-accent text-ink hover:text-on-accent border border-white/25 hover:border-accent backdrop-blur-xl backdrop-saturate-150 px-4 py-2.5 text-xs font-semibold shadow-2xl transition-all cursor-pointer"
+              className="inline-flex items-center gap-2 rounded-xl bg-canvas/75 hover:bg-accent text-ink hover:text-on-accent border border-white/25 hover:border-accent backdrop-blur-xl backdrop-saturate-150 px-3.5 sm:px-4 py-2 sm:py-2.5 text-xs font-semibold shadow-2xl transition-all cursor-pointer"
             >
               <FastForward className="w-3.5 h-3.5" />
               <span>
@@ -1780,7 +1782,7 @@ export function TheaterPlayer({
                     ? 'Skip Ending'
                     : 'Skip Recap'}
               </span>
-              <span className="tabular-nums text-[10px] opacity-65 ml-0.5">S</span>
+              <span className="hidden sm:inline tabular-nums text-[10px] opacity-65 ml-0.5">S</span>
             </button>
           </div>
         )}
@@ -1789,7 +1791,7 @@ export function TheaterPlayer({
         {upNextCountdown !== null && nextItem && (
           <div
             onClick={(e) => e.stopPropagation()}
-            className="absolute bottom-28 right-6 w-80 rounded-xl bg-canvas/82 backdrop-blur-xl backdrop-saturate-150 border border-white/25 p-4 shadow-2xl"
+            className="absolute bottom-24 sm:bottom-28 inset-x-3 sm:inset-x-auto sm:right-6 sm:w-80 rounded-xl bg-canvas/82 backdrop-blur-xl backdrop-saturate-150 border border-white/25 p-4 shadow-2xl"
           >
             <div className="flex items-center justify-between text-[10px] tabular-nums uppercase tracking-wider text-telemetry mb-1">
               <span>Up Next in {upNextCountdown}s</span>
@@ -1822,7 +1824,7 @@ export function TheaterPlayer({
         {/* Top OSD Bar */}
         <div
           onClick={(e) => e.stopPropagation()}
-          className={`absolute top-0 inset-x-0 px-5 py-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex items-center justify-between gap-4 transition-opacity duration-300 ${
+          className={`absolute top-0 inset-x-0 px-3 sm:px-5 py-3 sm:py-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex items-center justify-between gap-2 sm:gap-4 transition-opacity duration-300 ${
             osdVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
           }`}
         >
@@ -1859,13 +1861,13 @@ export function TheaterPlayer({
         {/* Bottom OSD Control Deck */}
         <div
           onClick={(e) => e.stopPropagation()}
-          className={`absolute bottom-0 inset-x-0 px-5 pb-4 pt-12 bg-gradient-to-t from-black/90 via-black/60 to-transparent transition-opacity duration-300 ${
+          className={`absolute bottom-0 inset-x-0 px-3 sm:px-5 pb-3 sm:pb-4 pt-10 sm:pt-12 bg-gradient-to-t from-black/90 via-black/60 to-transparent transition-opacity duration-300 ${
             osdVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
           }`}
         >
           {/* Scrubber Row */}
-          <div className="flex items-center gap-3 mb-2.5">
-            <span className="tabular-nums text-xs text-ink w-14 text-right">
+          <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-2.5">
+            <span className="tabular-nums text-[11px] sm:text-xs text-ink w-11 sm:w-14 text-right shrink-0">
               {formatClock(currentTime)}
             </span>
 
@@ -1922,20 +1924,20 @@ export function TheaterPlayer({
               />
             </div>
 
-            <span className="tabular-nums text-xs text-ink-secondary w-14">
+            <span className="tabular-nums text-[11px] sm:text-xs text-ink-secondary w-11 sm:w-14 shrink-0">
               -{formatClock(remainingSec)}
             </span>
           </div>
 
           {/* Transport + Modifiable Menus Row */}
-          <div className="relative flex items-center justify-between gap-4">
+          <div className="relative flex items-center justify-between gap-1 sm:gap-4">
             {/* Left Transport Controls */}
-            <div className="flex items-center gap-1.5 sm:gap-2.5">
+            <div className="flex items-center gap-0.5 sm:gap-2.5">
               <button
                 type="button"
                 onClick={() => seekBy(-10)}
                 title="Back 10s (← / J)"
-                className="p-2 rounded-lg text-ink/85 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="p-1.5 sm:p-2 rounded-lg text-ink/85 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
               >
                 <RotateCcw className="w-4 h-4" />
               </button>
@@ -1944,7 +1946,7 @@ export function TheaterPlayer({
                 type="button"
                 onClick={togglePlay}
                 title="Play / Pause (Space / K)"
-                className="p-2 rounded-lg text-ink hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="p-1.5 sm:p-2 rounded-lg text-ink hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
               >
                 {playing ? <Pause className="w-5 h-5 fill-current" /> : <Play className="w-5 h-5 fill-current" />}
               </button>
@@ -1953,7 +1955,7 @@ export function TheaterPlayer({
                 type="button"
                 onClick={() => seekBy(30)}
                 title="Forward 30s"
-                className="p-2 rounded-lg text-ink/85 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="p-1.5 sm:p-2 rounded-lg text-ink/85 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
               >
                 <RotateCw className="w-4 h-4" />
               </button>
@@ -1963,7 +1965,7 @@ export function TheaterPlayer({
                   type="button"
                   onClick={() => onSelectItem(nextItem)}
                   title={`Next: ${nextItem.title}`}
-                  className="p-2 rounded-lg text-ink/85 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                  className="p-1.5 sm:p-2 rounded-lg text-ink/85 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 >
                   <SkipForward className="w-4 h-4" />
                 </button>
@@ -1977,7 +1979,7 @@ export function TheaterPlayer({
             </div>
 
             {/* Right Controls: Sub/Dub, CC, Volume, Settings, PiP, Fullscreen */}
-            <div className="flex items-center gap-1 sm:gap-2">
+            <div className="flex items-center gap-0.5 sm:gap-2">
               {isDualAudioAnime && (
                 <button
                   type="button"
@@ -1987,10 +1989,11 @@ export function TheaterPlayer({
                       ? 'Switch to English Dub (with Signs & Songs)'
                       : 'Switch to Japanese Subbed (with Full Subtitles)'
                   }
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface/80 hover:bg-elevated border border-white/18 text-[11px] tabular-nums text-ink hover:text-ink transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-lg bg-surface/80 hover:bg-elevated border border-white/18 text-[11px] tabular-nums text-ink hover:text-ink transition-colors cursor-pointer"
                 >
                   <Languages className="w-3.5 h-3.5 text-telemetry" />
-                  <span>{isCurrentlyJapanese ? 'SUB · JP' : 'DUB · EN'}</span>
+                  <span className="hidden sm:inline">{isCurrentlyJapanese ? 'SUB · JP' : 'DUB · EN'}</span>
+                  <span className="sm:hidden">{isCurrentlyJapanese ? 'JP' : 'EN'}</span>
                 </button>
               )}
 
@@ -2000,7 +2003,7 @@ export function TheaterPlayer({
                   type="button"
                   onClick={() => setOpenMenu(openMenu === 'subtitles' ? 'none' : 'subtitles')}
                   title="Subtitles & Appearance (C)"
-                  className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                  className={`p-1.5 sm:p-2 rounded-lg transition-colors cursor-pointer ${
                     selectedSubIdx !== null || openMenu === 'subtitles'
                       ? 'text-telemetry bg-telemetry/15'
                       : 'text-ink/85 hover:text-white hover:bg-white/10'
@@ -2010,7 +2013,7 @@ export function TheaterPlayer({
                 </button>
 
                 {openMenu === 'subtitles' && (
-                  <div className="absolute bottom-12 right-0 w-76 rounded-xl bg-canvas/86 backdrop-blur-xl backdrop-saturate-150 border border-white/14 p-4 shadow-2xl space-y-4 max-h-[70vh] overflow-y-auto">
+                  <div className="fixed inset-x-3 bottom-24 sm:inset-x-auto sm:absolute sm:bottom-12 sm:right-0 sm:w-76 z-50 rounded-xl bg-canvas/92 backdrop-blur-xl backdrop-saturate-150 border border-white/14 p-4 shadow-2xl space-y-4 max-h-[60vh] sm:max-h-[70vh] overflow-y-auto">
                     <div>
                       <div className="text-[10px] font-semibold uppercase tracking-widest text-ink-secondary mb-2">
                         Subtitles
@@ -2144,7 +2147,7 @@ export function TheaterPlayer({
                   type="button"
                   onClick={toggleMute}
                   title="Mute (M)"
-                  className="p-2 rounded-lg text-ink/85 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                  className="p-1.5 sm:p-2 rounded-lg text-ink/85 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                 >
                   {muted || volume === 0 ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                 </button>
@@ -2165,7 +2168,7 @@ export function TheaterPlayer({
                   type="button"
                   onClick={() => setOpenMenu(openMenu === 'settings' ? 'none' : 'settings')}
                   title="Playback Quality, Audio & Speed"
-                  className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                  className={`p-1.5 sm:p-2 rounded-lg transition-colors cursor-pointer ${
                     openMenu === 'settings'
                       ? 'text-telemetry bg-telemetry/15'
                       : 'text-ink/85 hover:text-white hover:bg-white/10'
@@ -2175,7 +2178,7 @@ export function TheaterPlayer({
                 </button>
 
                 {openMenu === 'settings' && (
-                  <div className="absolute bottom-12 right-0 w-72 rounded-xl bg-canvas/86 backdrop-blur-xl backdrop-saturate-150 border border-white/14 p-4 shadow-2xl space-y-4 max-h-[70vh] overflow-y-auto">
+                  <div className="fixed inset-x-3 bottom-24 sm:inset-x-auto sm:absolute sm:bottom-12 sm:right-0 sm:w-72 z-50 rounded-xl bg-canvas/92 backdrop-blur-xl backdrop-saturate-150 border border-white/14 p-4 shadow-2xl space-y-4 max-h-[60vh] sm:max-h-[70vh] overflow-y-auto">
                     {/* Quality */}
                     <div>
                       <div className="flex items-center justify-between text-[10px] font-semibold uppercase tracking-widest text-ink-secondary mb-2">
@@ -2283,7 +2286,7 @@ export function TheaterPlayer({
                 type="button"
                 onClick={toggleFullscreen}
                 title="Fullscreen (F)"
-                className="p-2 rounded-lg text-ink/85 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                className="p-1.5 sm:p-2 rounded-lg text-ink/85 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
               >
                 {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
               </button>
