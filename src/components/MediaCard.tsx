@@ -1,0 +1,126 @@
+import { Play, X } from 'lucide-react';
+import { formatDuration, type MediaItemSummary, type PlaybackProgress } from '../lib/api';
+import { AppLink, itemPath } from './AppLink';
+import { LuneMark } from './LuneMark';
+
+interface Props {
+  item: MediaItemSummary;
+  progress?: PlaybackProgress;
+  onSelect: (item: MediaItemSummary) => void;
+  onRemove?: (item: MediaItemSummary) => void;
+  removeLabel?: string;
+}
+
+export function MediaCard({ item, progress, onSelect, onRemove, removeLabel = 'Remove' }: Props) {
+  const resBadge =
+    item.video_height && item.video_height >= 2000
+      ? '4K'
+      : item.video_height && item.video_height >= 1000
+        ? '1080p'
+        : item.video_height && item.video_height >= 700
+          ? '720p'
+          : '';
+
+  const hdrBadge =
+    item.video_hdr && item.video_hdr !== 'sdr' ? item.video_hdr.toUpperCase() : '';
+
+  const pct =
+    progress && progress.duration_ms > 0
+      ? Math.min(100, Math.round((progress.position_ms / progress.duration_ms) * 100))
+      : 0;
+
+  return (
+    <div className="relative group/card w-full">
+      <AppLink
+        href={itemPath(item.id)}
+        onNavigate={() => onSelect(item)}
+        className="group w-full text-left flex flex-col rounded-xl bg-surface border border-tone/[0.08] hover:border-tone/25 overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_12px_28px_rgba(0,0,0,0.22)] cursor-pointer"
+      >
+        <div className="relative aspect-[2/3] w-full bg-gradient-to-br from-elevated via-surface to-canvas overflow-hidden">
+          {item.poster_url ? (
+            <img
+              src={item.poster_url}
+              alt={item.title}
+              loading="lazy"
+              decoding="async"
+              className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
+            />
+          ) : (
+            <div className="w-full h-full flex flex-col items-center justify-center p-5 text-center relative">
+              <LuneMark alt="" className="w-10 h-10 opacity-30 mb-3" />
+              <span className="text-xs font-medium text-ink-secondary line-clamp-3">{item.title}</span>
+            </div>
+          )}
+
+          {/* Resolution, HDR & Dual Audio pills */}
+          {(resBadge || hdrBadge || item.dual_audio) && (
+            <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 flex-wrap pr-8">
+              {resBadge && (
+                <span className="px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-md border border-white/15 tabular-nums text-[10px] font-semibold tracking-wide text-white">
+                  {resBadge}
+                </span>
+              )}
+              {hdrBadge && (
+                <span className="px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-md border border-white/25 tabular-nums text-[10px] font-semibold tracking-wide text-white">
+                  {hdrBadge}
+                </span>
+              )}
+              {item.dual_audio && (
+                <span className="px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-md border border-[#64D2FF]/40 tabular-nums text-[10px] font-semibold tracking-wide text-[#64D2FF]">
+                  DUAL
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Hover play overlay */}
+          <div className="absolute inset-0 bg-black/35 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+            <div className="w-11 h-11 rounded-full bg-white text-[#09090B] flex items-center justify-center shadow-lg">
+              <Play className="w-5 h-5 fill-current ml-0.5" />
+            </div>
+          </div>
+
+          {/* Continue watching progress bar */}
+          {pct > 0 && (
+            <div className="absolute bottom-0 inset-x-0 h-1 bg-black/65">
+              <div className="h-full bg-white" style={{ width: `${pct}%` }} />
+            </div>
+          )}
+        </div>
+
+        <div className="p-3 flex flex-col gap-0.5">
+          <div className="text-sm font-medium tracking-[-0.01em] text-ink truncate">
+            {item.series_title ? item.series_title : item.title}
+          </div>
+          <div className="flex items-center justify-between text-[11px] text-ink-secondary gap-2 tabular-nums">
+            <span className="truncate">
+              {item.series_title && item.season_number != null && item.episode_number != null
+                ? `S${String(item.season_number).padStart(2, '0')}E${String(item.episode_number).padStart(2, '0')} · ${item.title}`
+                : item.year ?? item.container?.toUpperCase() ?? 'Media'}
+            </span>
+            {item.duration_ms > 0 && (
+              <span className="tabular-nums text-[10.5px] text-ink-muted shrink-0">
+                {formatDuration(item.duration_ms)}
+              </span>
+            )}
+          </div>
+        </div>
+      </AppLink>
+
+      {onRemove && (
+        <button
+          type="button"
+          title={removeLabel}
+          aria-label={removeLabel}
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove(item);
+          }}
+          className="absolute top-2 right-2 z-10 w-7 h-7 rounded-full bg-black/65 hover:bg-danger text-white/85 hover:text-white border border-white/20 hover:border-danger backdrop-blur-md flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover/card:opacity-100 sm:focus-visible:opacity-100 transition-all duration-150 cursor-pointer shadow-md"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
+      )}
+    </div>
+  );
+}

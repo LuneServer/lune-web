@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" role="img" aria-label="Lune">
+  <defs>
+    <linearGradient id="lune-horizon-light" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" stop-color="#1D1D1F" />
+      <stop offset="65%" stop-color="#3A3A3E" />
+      <stop offset="100%" stop-color="#6E6E73" />
+    </linearGradient>
+  </defs>
+  <path d="M 13.11 33.5 A 19 19 0 1 1 50.89 33.5 Z" fill="url(#lune-horizon-light)" />
+  <rect x="10" y="37.5" width="44" height="3.2" rx="1.6" fill="url(#lune-horizon-light)" opacity="0.9" />
+  <rect x="17" y="43.7" width="30" height="2.8" rx="1.4" fill="url(#lune-horizon-light)" opacity="0.55" />
+  <rect x="24" y="49.5" width="16" height="2.4" rx="1.2" fill="url(#lune-horizon-light)" opacity="0.28" />
+</svg>

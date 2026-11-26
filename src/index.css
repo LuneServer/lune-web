@@ -1,0 +1,75 @@
+@import "tailwindcss";
+@import "./tokens.css";
+
+@theme inline {
+  --color-canvas: var(--lune-bg-canvas);
+  --color-surface: var(--lune-bg-surface);
+  --color-elevated: var(--lune-bg-elevated);
+  --color-hairline: var(--lune-hairline);
+  --color-tone: var(--lune-tone);
+
+  --color-ink: var(--lune-text-primary);
+  --color-ink-secondary: var(--lune-text-secondary);
+  --color-ink-muted: var(--lune-text-muted);
+
+  --color-accent: var(--lune-accent-primary);
+  --color-accent-hover: var(--lune-accent-primary-hover);
+  --color-on-accent: var(--lune-text-on-accent);
+
+  --color-telemetry: var(--lune-accent-telemetry);
+  --color-healthy: var(--lune-status-healthy);
+  --color-warning: var(--lune-status-warning);
+  --color-danger: var(--lune-status-danger);
+
+  --font-sans: var(--lune-font-sans);
+  --font-display: var(--lune-font-display);
+  --font-mono: var(--lune-font-mono);
+}
+
+html,
+body {
+  background-color: var(--lune-bg-canvas);
+  color: var(--lune-text-primary);
+  font-family: var(--lune-font-sans);
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100%;
+  transition: background-color 180ms ease, color 180ms ease;
+}
+
+.lune-backdrop {
+  background:
+    radial-gradient(80% 45% at 50% -15%, var(--lune-backdrop-sheen) 0%, transparent 70%),
+    var(--lune-bg-canvas);
+}
+
+/* Theme-aware Horizon mark switcher */
+.lune-mark-light {
+  display: none;
+}
+
+[data-theme="light"] .lune-mark-dark {
+  display: none;
+}
+
+[data-theme="light"] .lune-mark-light {
+  display: block;
+}
+
+[data-theme="dark"] .lune-mark-dark {
+  display: block;
+}
+
+[data-theme="dark"] .lune-mark-light {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

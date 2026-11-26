@@ -1,0 +1,180 @@
+/* Lune Design System Tokens — v2.0
+ * Cinema-first neutral dark palette (Obsidian & Lunar Silver) with crisp Light Mode & uniform typography.
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* Raw brand palette */
+  --lune-obsidian: #09090b;
+  --lune-graphite: #141417;
+  --lune-charcoal: #1e1e22;
+  --lune-hairline: #2c2c31;
+  --lune-pure-white: #ffffff;
+  --lune-lunar-silver: #f5f5f7;
+  --lune-silver-muted: #a1a1a6;
+  --lune-silver-subtle: #7c7c82;
+  --lune-lunar-blue: #64d2ff;
+
+  /* Adaptive foreground tone for translucent surfaces, hairlines, and hover borders */
+  --lune-tone: #ffffff;
+
+  /* Semantic surfaces (dark default) */
+  --lune-bg-canvas: var(--lune-obsidian);
+  --lune-bg-surface: var(--lune-graphite);
+  --lune-bg-elevated: var(--lune-charcoal);
+  --lune-bg-overlay: rgba(9, 9, 11, 0.80);
+  --lune-backdrop-sheen: rgba(255, 255, 255, 0.045);
+
+  /* Semantic borders */
+  --lune-border-subtle: rgba(255, 255, 255, 0.08);
+  --lune-border-default: rgba(255, 255, 255, 0.13);
+  --lune-border-strong: rgba(255, 255, 255, 0.24);
+  --lune-border-focus: rgba(255, 255, 255, 0.55);
+
+  /* Semantic text */
+  --lune-text-primary: var(--lune-lunar-silver);
+  --lune-text-secondary: var(--lune-silver-muted);
+  --lune-text-muted: var(--lune-silver-subtle);
+  --lune-text-accent: var(--lune-pure-white);
+  --lune-text-on-accent: var(--lune-obsidian);
+
+  /* Interactive & telemetry accents */
+  --lune-accent-primary: var(--lune-pure-white);
+  --lune-accent-primary-hover: #e5e5ea;
+  --lune-accent-primary-soft: rgba(255, 255, 255, 0.11);
+  --lune-accent-telemetry: var(--lune-lunar-blue);
+  --lune-accent-telemetry-soft: rgba(100, 210, 255, 0.13);
+
+  /* Calibrated dark-mode status tones */
+  --lune-status-healthy: #30d158;
+  --lune-status-warning: #f5c451;
+  --lune-status-danger: #ff6961;
+
+  /* Uniform typography */
+  --lune-font-display: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --lune-font-sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --lune-font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  /* Radii */
+  --lune-radius-sm: 8px;
+  --lune-radius-md: 12px;
+  --lune-radius-lg: 16px;
+  --lune-radius-icon: 22%;
+  --lune-radius-pill: 9999px;
+
+  /* Elevation */
+  --lune-shadow-card: 0 10px 30px rgba(0, 0, 0, 0.50);
+  --lune-shadow-glow: 0 0 24px rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="light"] {
+  color-scheme: light;
+
+  --lune-hairline: #d2d2d7;
+  --lune-tone: #1d1d1f;
+
+  --lune-bg-canvas: #f5f5f7;
+  --lune-bg-surface: #ffffff;
+  --lune-bg-elevated: #e8e8ed;
+  --lune-bg-overlay: rgba(245, 245, 247, 0.85);
+  --lune-backdrop-sheen: rgba(0, 0, 0, 0.025);
+
+  --lune-border-subtle: rgba(0, 0, 0, 0.07);
+  --lune-border-default: rgba(0, 0, 0, 0.12);
+  --lune-border-strong: rgba(0, 0, 0, 0.22);
+  --lune-border-focus: rgba(29, 29, 31, 0.45);
+
+  --lune-text-primary: #1d1d1f;
+  --lune-text-secondary: #515154;
+  --lune-text-muted: #6e6e73;
+  --lune-text-accent: #1d1d1f;
+  --lune-text-on-accent: #ffffff;
+
+  --lune-accent-primary: #1d1d1f;
+  --lune-accent-primary-hover: #333336;
+  --lune-accent-primary-soft: rgba(0, 0, 0, 0.07);
+  --lune-accent-telemetry: #0071e3;
+  --lune-accent-telemetry-soft: rgba(0, 113, 227, 0.10);
+
+  --lune-status-healthy: #1d8f44;
+  --lune-status-warning: #b27000;
+  --lune-status-danger: #d93025;
+
+  --lune-shadow-card: 0 4px 16px rgba(0, 0, 0, 0.06);
+  --lune-shadow-glow: 0 0 18px rgba(0, 0, 0, 0.08);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+
+    --lune-hairline: #d2d2d7;
+    --lune-tone: #1d1d1f;
+
+    --lune-bg-canvas: #f5f5f7;
+    --lune-bg-surface: #ffffff;
+    --lune-bg-elevated: #e8e8ed;
+    --lune-bg-overlay: rgba(245, 245, 247, 0.85);
+    --lune-backdrop-sheen: rgba(0, 0, 0, 0.025);
+
+    --lune-border-subtle: rgba(0, 0, 0, 0.07);
+    --lune-border-default: rgba(0, 0, 0, 0.12);
+    --lune-border-strong: rgba(0, 0, 0, 0.22);
+    --lune-border-focus: rgba(29, 29, 31, 0.45);
+
+    --lune-text-primary: #1d1d1f;
+    --lune-text-secondary: #515154;
+    --lune-text-muted: #6e6e73;
+    --lune-text-accent: #1d1d1f;
+    --lune-text-on-accent: #ffffff;
+
+    --lune-accent-primary: #1d1d1f;
+    --lune-accent-primary-hover: #333336;
+    --lune-accent-primary-soft: rgba(0, 0, 0, 0.07);
+    --lune-accent-telemetry: #0071e3;
+    --lune-accent-telemetry-soft: rgba(0, 113, 227, 0.10);
+
+    --lune-status-healthy: #1d8f44;
+    --lune-status-warning: #b27000;
+    --lune-status-danger: #d93025;
+
+    --lune-shadow-card: 0 4px 16px rgba(0, 0, 0, 0.06);
+    --lune-shadow-glow: 0 0 18px rgba(0, 0, 0, 0.08);
+  }
+}
+
+/* Explicit dark-theme scope (e.g. TheaterPlayer inside Light Mode) */
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --lune-hairline: #2c2c31;
+  --lune-tone: #ffffff;
+
+  --lune-bg-canvas: #09090b;
+  --lune-bg-surface: #141417;
+  --lune-bg-elevated: #1e1e22;
+  --lune-bg-overlay: rgba(9, 9, 11, 0.80);
+  --lune-backdrop-sheen: rgba(255, 255, 255, 0.045);
+
+  --lune-border-subtle: rgba(255, 255, 255, 0.08);
+  --lune-border-default: rgba(255, 255, 255, 0.13);
+  --lune-border-strong: rgba(255, 255, 255, 0.24);
+  --lune-border-focus: rgba(255, 255, 255, 0.55);
+
+  --lune-text-primary: #f5f5f7;
+  --lune-text-secondary: #a1a1a6;
+  --lune-text-muted: #7c7c82;
+  --lune-text-accent: #ffffff;
+  --lune-text-on-accent: #09090b;
+
+  --lune-accent-primary: #ffffff;
+  --lune-accent-primary-hover: #e5e5ea;
+  --lune-accent-primary-soft: rgba(255, 255, 255, 0.11);
+  --lune-accent-telemetry: #64d2ff;
+  --lune-accent-telemetry-soft: rgba(100, 210, 255, 0.13);
+
+  --lune-status-healthy: #30d158;
+  --lune-status-warning: #f5c451;
+  --lune-status-danger: #ff6961;
+}
