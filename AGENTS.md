@@ -69,7 +69,7 @@ lune-web/
         ├── PreferencesModal.tsx      # User playback preferences modal: one-click Anime Subbed/Dubbed presets, default audio/subtitle language, subtitles toggle, autoplay next, combine Next Up toggle, and TOTP 2FA enrollment/recovery codes
         ├── RequestsPage.tsx          # User-facing Media Requests & Discover page (/requests): TMDB discovery/search with Seerr-style filters (sort, genre, year, min score, language, Not in Library toggle), frosted request confirmation modal, My Requests & admin All Requests tabs (neutral App Store-compliant UX)
         ├── DevicePair.tsx            # RFC 8628 TV/mobile device pairing code approval
-        ├── AdminConsole.tsx          # Category-routed admin console shell (/console, /console/libraries, /console/requests, /console/users, /console/invites, /console/playback, /console/network, /console/activity)
+        ├── AdminConsole.tsx          # Category-routed admin console shell (/console, /console/libraries, /console/requests, /console/users, /console/invites, /console/playback, /console/network, /console/maintenance, /console/activity)
         └── console/
             ├── ConsoleOverview.tsx   # Console home: server/library stats, system alerts, live active playbacks (with stop), and recent activity feed
             ├── ConsoleLibraries.tsx  # Library registration (movies/shows/anime/music/other), incremental/force scans, metadata refresh, deletion, and an expandable scan-error panel (per-file path + reason from `scan.error_samples` / `last_error`)
@@ -78,6 +78,7 @@ lune-web/
             ├── ConsoleInvites.tsx    # Expiring invite link creation (with role/library scoping & canonical public_url origin), one-time link copy, and revocation
             ├── ConsolePlayback.tsx   # Live playback & transcoding limits settings (server-wide & per-user concurrent transcode caps, idle transcode timeout)
             ├── ConsoleNetwork.tsx    # Access mode & networking settings (Entirely Local, Built-in ACME HTTPS + Cloudflare DNS-01, Reverse Proxy, Tailscale), LAN-only Admin Console switch, IP allowlist/blocklist, and active IP ban management
+            ├── ConsoleMaintenance.tsx # Periodic housekeeping status, last-run metrics, manual "Run Maintenance Now", and live-editable schedule/task retention settings
             ├── ConsoleActivity.tsx   # Searchable & filterable security/activity audit log
             └── auditUtils.ts         # Shared audit event categorization and alert detection helpers
 ```

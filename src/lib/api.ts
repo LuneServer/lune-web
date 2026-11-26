@@ -55,6 +55,42 @@ export interface StreamingConfig {
   idle_timeout_minutes: number;  // 1..120
 }
 
+export interface MaintenanceConfig {
+  enabled: boolean;
+  interval_hours: number;
+  schedule_time?: string;
+  cleanup_orphaned_artwork: boolean;
+  artwork_grace_hours: number;
+  cleanup_transcode_cache: boolean;
+  subtitle_cache_days: number;
+  prune_audit_logs: boolean;
+  audit_retention_days: number;
+  optimize_database: boolean;
+}
+
+export interface MaintenanceRunReport {
+  started_at: string;
+  finished_at: string;
+  duration_ms: number;
+  trigger: 'scheduled' | 'manual' | string;
+  skipped_artwork_scan_busy?: boolean;
+  artwork_files_removed: number;
+  artwork_bytes_freed: number;
+  transcode_items_removed: number;
+  transcode_bytes_freed: number;
+  audit_events_pruned: number;
+  database_optimized: boolean;
+  errors?: string[];
+}
+
+export interface MaintenanceStatus {
+  config: MaintenanceConfig;
+  running: boolean;
+  last_run?: MaintenanceRunReport;
+  next_run_at?: string;
+  server_timezone?: string;
+}
+
 export interface HealthStatus {
   status: string;
   version: string;
@@ -1058,6 +1094,17 @@ export const api = {
     request<StreamingConfig>('/api/v1/admin/streaming/config', {
       method: 'PUT',
       body: JSON.stringify(cfg),
+    }),
+
+  adminGetMaintenance: () => request<MaintenanceStatus>('/api/v1/admin/maintenance'),
+  adminSaveMaintenanceConfig: (cfg: MaintenanceConfig) =>
+    request<MaintenanceStatus>('/api/v1/admin/maintenance/config', {
+      method: 'PUT',
+      body: JSON.stringify(cfg),
+    }),
+  adminRunMaintenance: () =>
+    request<MaintenanceStatus>('/api/v1/admin/maintenance/run', {
+      method: 'POST',
     }),
 };
 

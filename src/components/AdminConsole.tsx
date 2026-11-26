@@ -9,6 +9,7 @@ import {
   ShieldAlert,
   SlidersHorizontal,
   Users,
+  Wrench,
 } from 'lucide-react';
 import {
   api,
@@ -28,6 +29,7 @@ import { ConsoleActivity } from './console/ConsoleActivity';
 import { ConsoleRequests } from './console/ConsoleRequests';
 import { ConsolePlayback } from './console/ConsolePlayback';
 import { ConsoleNetwork } from './console/ConsoleNetwork';
+import { ConsoleMaintenance } from './console/ConsoleMaintenance';
 import { buildConsoleAlerts } from './console/auditUtils';
 import { AppLink, consolePath } from './AppLink';
 
@@ -61,6 +63,7 @@ export type ConsoleSection =
   | 'invites'
   | 'playback'
   | 'network'
+  | 'maintenance'
   | 'activity';
 
 interface Props {
@@ -102,6 +105,10 @@ const SECTION_META: Record<ConsoleSection, { title: string; subtitle: string }> 
   network: {
     title: 'Network',
     subtitle: 'Configure access mode, built-in HTTPS, reverse proxy, or Tailscale.',
+  },
+  maintenance: {
+    title: 'Maintenance',
+    subtitle: 'Configure periodic housekeeping, retention windows, and run cleanup passes.',
   },
   activity: {
     title: 'Activity & Security',
@@ -247,6 +254,11 @@ export function AdminConsole({
       id: 'network',
       label: 'Network',
       icon: Globe,
+    },
+    {
+      id: 'maintenance',
+      label: 'Maintenance',
+      icon: Wrench,
     },
     {
       id: 'activity',
@@ -395,6 +407,8 @@ export function AdminConsole({
               }}
             />
           )}
+
+          {section === 'maintenance' && <ConsoleMaintenance />}
 
           {section === 'activity' && <ConsoleActivity events={events} />}
 
