@@ -54,6 +54,7 @@ interface Cue {
 type QualityPreset = {
   id: string;
   label: string;
+  minSourceWidth?: number;
   minSourceHeight?: number;
   maxBitrate?: number;
   maxHeight?: number;
@@ -62,10 +63,10 @@ type QualityPreset = {
 
 const QUALITY_PRESETS: QualityPreset[] = [
   { id: 'original', label: 'Original (Auto)' },
-  { id: '4k-40', label: '4K · 40 Mbps', minSourceHeight: 1800, maxBitrate: 40_000_000, maxHeight: 2160, forceTranscode: true },
-  { id: '1080p-20', label: '1080p · 20 Mbps', minSourceHeight: 1000, maxBitrate: 20_000_000, maxHeight: 1080, forceTranscode: true },
-  { id: '1080p-10', label: '1080p · 10 Mbps', minSourceHeight: 1000, maxBitrate: 10_000_000, maxHeight: 1080, forceTranscode: true },
-  { id: '720p', label: '720p · 4 Mbps', minSourceHeight: 680, maxBitrate: 4_000_000, maxHeight: 720, forceTranscode: true },
+  { id: '4k-40', label: '4K · 40 Mbps', minSourceWidth: 3200, minSourceHeight: 1800, maxBitrate: 40_000_000, maxHeight: 2160, forceTranscode: true },
+  { id: '1080p-20', label: '1080p · 20 Mbps', minSourceWidth: 1800, minSourceHeight: 1000, maxBitrate: 20_000_000, maxHeight: 1080, forceTranscode: true },
+  { id: '1080p-10', label: '1080p · 10 Mbps', minSourceWidth: 1800, minSourceHeight: 1000, maxBitrate: 10_000_000, maxHeight: 1080, forceTranscode: true },
+  { id: '720p', label: '720p · 4 Mbps', minSourceWidth: 1200, minSourceHeight: 680, maxBitrate: 4_000_000, maxHeight: 720, forceTranscode: true },
   { id: '480p', label: '480p · 1.5 Mbps', maxBitrate: 1_500_000, maxHeight: 480, forceTranscode: true },
 ];
 
@@ -195,10 +196,16 @@ export function TheaterPlayer({
   durationRef.current = duration;
 
   const availablePresets = useMemo(() => {
+    const srcW = detail?.video_width || initialItem?.video_width || 0;
     const srcH = detail?.video_height || initialItem?.video_height || 0;
-    if (!srcH) return QUALITY_PRESETS;
-    return QUALITY_PRESETS.filter((p) => !p.minSourceHeight || srcH >= p.minSourceHeight);
-  }, [detail?.video_height, initialItem?.video_height]);
+    if (!srcW && !srcH) return QUALITY_PRESETS;
+    return QUALITY_PRESETS.filter(
+      (p) =>
+        (!p.minSourceWidth && !p.minSourceHeight) ||
+        (p.minSourceWidth && srcW >= p.minSourceWidth) ||
+        (p.minSourceHeight && srcH >= p.minSourceHeight),
+    );
+  }, [detail?.video_width, detail?.video_height, initialItem?.video_width, initialItem?.video_height]);
 
   const stopActiveSession = useCallback(() => {
     const sid = activeSessionIdRef.current ?? planRef.current?.session_id ?? null;

@@ -99,6 +99,8 @@ export interface HealthStatus {
   uptime_seconds: number;
 }
 
+export type PosterBadge = 'resolution' | 'hdr' | 'dual_audio' | 'seasons' | 'rating';
+
 export interface UserPreferences {
   audio_language?: string;
   subtitle_language?: string;
@@ -106,6 +108,7 @@ export interface UserPreferences {
   autoplay_next: boolean;
   max_bitrate?: number;
   combine_next_up?: boolean;
+  poster_badges?: PosterBadge[];
 }
 
 export interface User {
@@ -461,6 +464,7 @@ export interface SeriesSummary {
   content_rating?: string;
   genres?: string[];
   overview?: string;
+  video_width?: number;
   video_height?: number;
   video_hdr?: string;
   season_count: number;
@@ -1175,6 +1179,20 @@ export function formatUptime(seconds: number): string {
   if (h > 0) return `${h}h ${m}m`;
   if (m > 0) return `${m}m ${s}s`;
   return `${s}s`;
+}
+
+export function formatResolution(width?: number, height?: number, includeSD = false): string {
+  const w = width ?? 0;
+  const h = height ?? 0;
+  if (!w && !h) return '';
+  if (w >= 3200 || h >= 2000) return '4K';
+  if (w >= 1800 || h >= 1000) return '1080p';
+  if (w >= 1200 || h >= 700) return '720p';
+  if (includeSD) {
+    if (w >= 640 || h >= 480) return '480p';
+    if (h > 0) return `${h}p`;
+  }
+  return '';
 }
 
 export function formatBytes(bytes: number): string {

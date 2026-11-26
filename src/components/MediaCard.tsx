@@ -1,28 +1,46 @@
-import { Play, X } from 'lucide-react';
-import { formatDuration, type MediaItemSummary, type PlaybackProgress } from '../lib/api';
+import { Play, Star, X } from 'lucide-react';
+import {
+  formatDuration,
+  formatResolution,
+  type MediaItemSummary,
+  type PlaybackProgress,
+  type PosterBadge,
+} from '../lib/api';
+import { usePosterBadges } from '../lib/posterBadges';
 import { AppLink, itemPath } from './AppLink';
 import { LuneMark } from './LuneMark';
 
 interface Props {
   item: MediaItemSummary;
   progress?: PlaybackProgress;
+  posterBadges?: PosterBadge[];
   onSelect: (item: MediaItemSummary) => void;
   onRemove?: (item: MediaItemSummary) => void;
   removeLabel?: string;
 }
 
-export function MediaCard({ item, progress, onSelect, onRemove, removeLabel = 'Remove' }: Props) {
-  const resBadge =
-    item.video_height && item.video_height >= 2000
-      ? '4K'
-      : item.video_height && item.video_height >= 1000
-        ? '1080p'
-        : item.video_height && item.video_height >= 700
-          ? '720p'
-          : '';
-
+export function MediaCard({
+  item,
+  progress,
+  posterBadges,
+  onSelect,
+  onRemove,
+  removeLabel = 'Remove',
+}: Props) {
+  const badges = usePosterBadges(posterBadges);
+  const resBadge = badges.has('resolution')
+    ? formatResolution(item.video_width, item.video_height)
+    : '';
   const hdrBadge =
-    item.video_hdr && item.video_hdr !== 'sdr' ? item.video_hdr.toUpperCase() : '';
+    badges.has('hdr') && item.video_hdr && item.video_hdr !== 'sdr'
+      ? item.video_hdr.toUpperCase()
+      : '';
+  const showDual = badges.has('dual_audio') && Boolean(item.dual_audio);
+  const ratingBadge =
+    badges.has('rating') && item.rating !== undefined && item.rating > 0
+      ? item.rating.toFixed(1)
+      : '';
+  const hasBadges = Boolean(resBadge || hdrBadge || showDual || ratingBadge);
 
   const pct =
     progress && progress.duration_ms > 0
@@ -52,8 +70,8 @@ export function MediaCard({ item, progress, onSelect, onRemove, removeLabel = 'R
             </div>
           )}
 
-          {/* Resolution, HDR & Dual Audio pills */}
-          {(resBadge || hdrBadge || item.dual_audio) && (
+          {/* Configurable poster metadata pills (default: none) */}
+          {hasBadges && (
             <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 flex-wrap pr-8">
               {resBadge && (
                 <span className="px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-md border border-white/15 tabular-nums text-[10px] font-semibold tracking-wide text-white">
@@ -65,9 +83,15 @@ export function MediaCard({ item, progress, onSelect, onRemove, removeLabel = 'R
                   {hdrBadge}
                 </span>
               )}
-              {item.dual_audio && (
+              {showDual && (
                 <span className="px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-md border border-[#64D2FF]/40 tabular-nums text-[10px] font-semibold tracking-wide text-[#64D2FF]">
                   DUAL
+                </span>
+              )}
+              {ratingBadge && (
+                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-black/60 backdrop-blur-md border border-white/15 tabular-nums text-[10px] font-semibold tracking-wide text-white">
+                  <Star className="w-2.5 h-2.5 fill-current" />
+                  {ratingBadge}
                 </span>
               )}
             </div>

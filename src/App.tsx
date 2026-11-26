@@ -41,6 +41,7 @@ import {
   type User,
 } from './lib/api';
 import { clearAllCaches, invalidateCatalogCache, viewCache } from './lib/cache';
+import { PosterBadgesContext } from './lib/posterBadges';
 import { AuthScreen } from './components/AuthScreen';
 import { TotpEnrollmentScreen } from './components/TotpEnrollmentScreen';
 import { MediaCard } from './components/MediaCard';
@@ -946,6 +947,7 @@ export function App() {
   const canAccessRequests = requestsEnabled && (user.role === 'admin' || user.can_request !== false);
 
   return (
+    <PosterBadgesContext.Provider value={user.preferences?.poster_badges ?? []}>
     <div className="lune-backdrop min-h-screen flex flex-col">
       {/* Top Navigation — stays visible above both detail pages and the enlarged theater player */}
       <header className="sticky top-0 z-50 bg-canvas/75 backdrop-blur-xl backdrop-saturate-150 border-b border-tone/[0.08]">
@@ -1997,5 +1999,6 @@ export function App() {
         />
       )}
     </div>
+    </PosterBadgesContext.Provider>
   );
 }
