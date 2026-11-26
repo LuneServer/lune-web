@@ -27,6 +27,37 @@
 
 ---
 
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%" align="center">
+      <a href="docs/screenshots/home.png"><img src="docs/screenshots/home.png" alt="Lune Web — Home &amp; Continue Watching" width="100%" /></a>
+      <br />
+      <sub><strong>Home &amp; Shelves</strong> — Continue Watching and recently added libraries</sub>
+    </td>
+    <td width="50%" align="center">
+      <a href="docs/screenshots/detail.png"><img src="docs/screenshots/detail.png" alt="Lune Web — Movie Detail Page" width="100%" /></a>
+      <br />
+      <sub><strong>Media Detail</strong> — Full-bleed backdrops, track selectors, and watchlist</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" align="center">
+      <a href="docs/screenshots/player.png"><img src="docs/screenshots/player.png" alt="Lune Web — Theater Player" width="100%" /></a>
+      <br />
+      <sub><strong>Theater Player</strong> — Direct Play, styled subtitles, Skip Opening, Sub/Dub</sub>
+    </td>
+    <td width="50%" align="center">
+      <a href="docs/screenshots/console.png"><img src="docs/screenshots/console.png" alt="Lune Web — Admin Console" width="100%" /></a>
+      <br />
+      <sub><strong>Admin Console</strong> — Server health, active streams, and library management</sub>
+    </td>
+  </tr>
+</table>
+
+---
+
 ## Features
 
 - **Cinema-First Design** — Dark, Light, and Auto (Match Device) themes that keep your artwork front and center, with video playback always pinned to cinema-dark.
