@@ -435,9 +435,18 @@ export function ItemDetailPage({
 
   function launchPlayback(startOverrideMS?: number) {
     if (!activeItem) return;
+    const selectedSub =
+      selectedSubIdx !== null
+        ? (detail?.subtitles ?? []).find((s) => s.index === selectedSubIdx)
+        : undefined;
+    const burnStreamIdx =
+      selectedSub?.requires_burn_in && selectedSub.stream_index !== undefined
+        ? selectedSub.stream_index
+        : undefined;
     onPlay(activeItem, {
       ...(selectedAudioIdx !== undefined ? { audioStreamIndex: selectedAudioIdx } : {}),
       subtitleIndex: selectedSubIdx,
+      ...(burnStreamIdx !== undefined ? { burnSubtitleStreamIndex: burnStreamIdx } : {}),
       ...(startOverrideMS !== undefined ? { startPositionMS: startOverrideMS } : {}),
     });
   }
@@ -659,12 +668,20 @@ export function ItemDetailPage({
                   );
                 }
                 if (activeItem.video_hdr && activeItem.video_hdr !== 'sdr') {
+                  const hdrLabel =
+                    activeItem.video_hdr.toLowerCase() === 'dovi_hdr10'
+                      ? 'DV · HDR10'
+                      : activeItem.video_hdr.toLowerCase() === 'dovi'
+                        ? 'DV'
+                        : activeItem.video_hdr.toLowerCase() === 'hdr10plus'
+                          ? 'HDR10+'
+                          : activeItem.video_hdr.toUpperCase();
                   metaParts.push(
                     <span
                       key="hdr"
                       className="px-1.5 py-0.5 rounded bg-surface border border-tone/18 text-[10px] font-semibold text-ink"
                     >
-                      {activeItem.video_hdr.toUpperCase()}
+                      {hdrLabel}
                     </span>,
                   );
                 }
@@ -979,12 +996,26 @@ export function ItemDetailPage({
                         className="appearance-none w-full h-9 rounded-lg bg-surface/70 hover:bg-surface border border-tone/12 hover:border-tone/25 pl-3 pr-8 text-xs text-ink tabular-nums truncate focus:outline-none focus:border-tone/45 transition-colors cursor-pointer"
                       >
                         <option value="">Off</option>
-                      {subtitleTracks.map((sub) => (
-                        <option key={sub.index} value={String(sub.index)}>
-                          {sub.label}
-                          {sub.format ? ` · ${sub.format === 'subrip' ? 'SRT' : sub.format.toUpperCase()}` : ''}
-                        </option>
-                      ))}
+                      {subtitleTracks.map((sub) => {
+                        const fmt = sub.format
+                          ? sub.format.toLowerCase() === 'subrip'
+                            ? 'SRT'
+                            : sub.format.toLowerCase() === 'hdmv_pgs_subtitle' || sub.format.toLowerCase() === 'pgssub'
+                              ? 'PGS'
+                              : sub.format.toLowerCase() === 'dvd_subtitle' || sub.format.toLowerCase() === 'vobsub'
+                                ? 'VOBSUB'
+                                : sub.format.toLowerCase() === 'dvb_subtitle' || sub.format.toLowerCase() === 'dvbsub'
+                                  ? 'DVB'
+                                  : sub.format.toUpperCase()
+                          : '';
+                        return (
+                          <option key={sub.index} value={String(sub.index)}>
+                            {sub.label}
+                            {fmt ? ` · ${fmt}` : ''}
+                            {sub.requires_burn_in ? ' (Burn-in)' : ''}
+                          </option>
+                        );
+                      })}
                       </select>
                       <ChevronDown className="w-3.5 h-3.5 text-ink-muted pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2" />
                     </div>

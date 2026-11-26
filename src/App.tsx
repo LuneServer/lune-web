@@ -331,6 +331,7 @@ export function App() {
   const [homeShelves, setHomeShelves] = useState<HomeShelf[]>(
     () => viewCache.getHome()?.homeShelves ?? [],
   );
+  const [homeLoading, setHomeLoading] = useState(false);
 
   // Per-view keyed grid state so Back/Forward never flashes another view's items
   const [gridState, setGridState] = useState<{
@@ -366,6 +367,9 @@ export function App() {
 
   // Real browser History API navigation so Back/Forward, trackpad swipe, and refresh work natively.
   const navigateTo = useCallback((nextView: View) => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    }
     const nextPath = viewToPath(nextView);
     const currentPath = window.location.pathname;
     scrollPositionsRef.current.set(currentEntryIdRef.current, window.scrollY);
@@ -564,55 +568,61 @@ export function App() {
             setWatchlistItems(cached.watchlistItems);
             setHomeShelves(cached.homeShelves);
           }
+          setHomeLoading(false);
           return;
         }
-        const [cwRes, nuRes, wlRes, shelves] = await Promise.all([
-          api.getContinueWatching(signal).catch(() => ({ items: [] })),
-          api.getNextUp(20, signal).catch(() => ({ items: [] })),
-          api.listWatchlist(30, signal).catch(() => ({ items: [], total: 0 })),
-          Promise.all(
-            libs.map(async (lib): Promise<HomeShelf> => {
-              if (lib.kind === 'shows') {
-                const sRes = await api
-                  .listSeries({ library_id: lib.id, sort: 'recent' }, signal)
-                  .catch(() => ({ series: [] }));
-                return { library: lib, series: sRes.series.slice(0, 15), items: [] };
-              }
-              if (lib.kind === 'anime') {
-                const [sRes, iRes] = await Promise.all([
-                  api.listSeries({ library_id: lib.id, sort: 'recent' }, signal).catch(() => ({ series: [] })),
-                  api
-                    .listItems({ library_id: lib.id, kind: 'movie', sort: 'recent', limit: 15 }, signal)
-                    .catch(() => ({ items: [], total: 0 })),
-                ]);
+        setHomeLoading(true);
+        try {
+          const [cwRes, nuRes, wlRes, shelves] = await Promise.all([
+            api.getContinueWatching(signal).catch(() => ({ items: [] })),
+            api.getNextUp(20, signal).catch(() => ({ items: [] })),
+            api.listWatchlist(30, signal).catch(() => ({ items: [], total: 0 })),
+            Promise.all(
+              libs.map(async (lib): Promise<HomeShelf> => {
+                if (lib.kind === 'shows') {
+                  const sRes = await api
+                    .listSeries({ library_id: lib.id, sort: 'recent' }, signal)
+                    .catch(() => ({ series: [] }));
+                  return { library: lib, series: sRes.series.slice(0, 15), items: [] };
+                }
+                if (lib.kind === 'anime') {
+                  const [sRes, iRes] = await Promise.all([
+                    api.listSeries({ library_id: lib.id, sort: 'recent' }, signal).catch(() => ({ series: [] })),
+                    api
+                      .listItems({ library_id: lib.id, kind: 'movie', sort: 'recent', limit: 15 }, signal)
+                      .catch(() => ({ items: [], total: 0 })),
+                  ]);
+                  return {
+                    library: lib,
+                    series: sRes.series.slice(0, 15),
+                    items: iRes.items.slice(0, 15),
+                  };
+                }
+                const iRes = await api
+                  .listItems({ library_id: lib.id, sort: 'recent', limit: 15 }, signal)
+                  .catch(() => ({ items: [], total: 0 }));
                 return {
                   library: lib,
-                  series: sRes.series.slice(0, 15),
-                  items: iRes.items.slice(0, 15),
+                  series: [],
+                  items: iRes.items.filter((m) => m.kind !== 'episode'),
                 };
-              }
-              const iRes = await api
-                .listItems({ library_id: lib.id, sort: 'recent', limit: 15 }, signal)
-                .catch(() => ({ items: [], total: 0 }));
-              return {
-                library: lib,
-                series: [],
-                items: iRes.items.filter((m) => m.kind !== 'episode'),
-              };
-            }),
-          ),
-        ]);
-        if (signal?.aborted) return;
-        viewCache.setHome({
-          continueItems: cwRes.items,
-          nextUpItems: nuRes.items,
-          watchlistItems: wlRes.items,
-          homeShelves: shelves,
-        });
-        setContinueItems(cwRes.items);
-        setNextUpItems(nuRes.items);
-        setWatchlistItems(wlRes.items);
-        setHomeShelves(shelves);
+              }),
+            ),
+          ]);
+          if (signal?.aborted) return;
+          viewCache.setHome({
+            continueItems: cwRes.items,
+            nextUpItems: nuRes.items,
+            watchlistItems: wlRes.items,
+            homeShelves: shelves,
+          });
+          setContinueItems(cwRes.items);
+          setNextUpItems(nuRes.items);
+          setWatchlistItems(wlRes.items);
+          setHomeShelves(shelves);
+        } finally {
+          if (!signal?.aborted) setHomeLoading(false);
+        }
         return;
       }
 
@@ -1380,23 +1390,35 @@ export function App() {
               )}
 
               {libraries.length === 0 ? (
-                <div className="rounded-2xl bg-surface/60 border border-tone/[0.08] p-12 text-center flex flex-col items-center">
-                  <div className="w-12 h-12 rounded-2xl bg-elevated flex items-center justify-center text-ink mb-4">
-                    <FolderOpen className="w-6 h-6" />
+                homeLoading ? (
+                  <div className="py-16 flex items-center justify-center gap-3 text-sm text-ink-secondary">
+                    <LuneMark alt="Lune" className="w-6 h-6 animate-pulse" />
+                    <span>Loading your library…</span>
                   </div>
-                  <h3 className="text-base font-semibold text-ink">Your universe is ready</h3>
-                  <p className="text-xs text-ink-secondary mt-1 max-w-sm">
-                    Register a media folder in the Console to scan your movies, shows, anime, or music.
-                  </p>
-                  {user.role === 'admin' && (
-                    <button
-                      type="button"
-                      onClick={() => navigateTo({ kind: 'console', section: 'libraries' })}
-                      className="mt-5 rounded-lg bg-accent hover:bg-accent-hover text-on-accent font-semibold text-xs px-4 py-2 transition-colors cursor-pointer"
-                    >
-                      Configure Libraries
-                    </button>
-                  )}
+                ) : (
+                  <div className="rounded-2xl bg-surface/60 border border-tone/[0.08] p-12 text-center flex flex-col items-center">
+                    <div className="w-12 h-12 rounded-2xl bg-elevated flex items-center justify-center text-ink mb-4">
+                      <FolderOpen className="w-6 h-6" />
+                    </div>
+                    <h3 className="text-base font-semibold text-ink">Your universe is ready</h3>
+                    <p className="text-xs text-ink-secondary mt-1 max-w-sm">
+                      Register a media folder in the Console to scan your movies, shows, anime, or music.
+                    </p>
+                    {user.role === 'admin' && (
+                      <button
+                        type="button"
+                        onClick={() => navigateTo({ kind: 'console', section: 'libraries' })}
+                        className="mt-5 rounded-lg bg-accent hover:bg-accent-hover text-on-accent font-semibold text-xs px-4 py-2 transition-colors cursor-pointer"
+                      >
+                        Configure Libraries
+                      </button>
+                    )}
+                  </div>
+                )
+              ) : homeShelves.length === 0 && homeLoading ? (
+                <div className="py-16 flex items-center justify-center gap-3 text-sm text-ink-secondary">
+                  <LuneMark alt="Lune" className="w-6 h-6 animate-pulse" />
+                  <span>Loading your library…</span>
                 </div>
               ) : (
                 homeShelves.map(({ library, series, items }) => {

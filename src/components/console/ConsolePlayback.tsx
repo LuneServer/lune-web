@@ -1,6 +1,24 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { CheckCircle2, Info, Loader2, Save } from 'lucide-react';
-import { api, ApiError, type StreamingConfig } from '../../lib/api';
+import { AlertTriangle, CheckCircle2, Cpu, Info, Loader2, Save } from 'lucide-react';
+import { api, ApiError, type StreamingConfig, type TranscoderStatus } from '../../lib/api';
+
+function formatHWAccelBackend(hw?: string): string {
+  switch ((hw ?? '').toLowerCase()) {
+    case 'vaapi':
+      return 'VA-API (Intel / AMD GPU)';
+    case 'qsv':
+      return 'Intel Quick Sync (QSV)';
+    case 'nvenc':
+      return 'NVIDIA NVENC';
+    case 'videotoolbox':
+      return 'Apple VideoToolbox';
+    case 'software':
+    case '':
+      return 'Software (CPU · libx264)';
+    default:
+      return hw ?? 'Software';
+  }
+}
 
 const DEFAULT_CONFIG: StreamingConfig = {
   max_global_transcodes: 0,
@@ -37,6 +55,7 @@ export function ConsolePlayback() {
   const [userLimitInput, setUserLimitInput] = useState('3');
 
   const [idleTimeoutInput, setIdleTimeoutInput] = useState('10');
+  const [transcoder, setTranscoder] = useState<TranscoderStatus | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -70,6 +89,7 @@ export function ConsolePlayback() {
       .then((res) => {
         if (!cancelled) {
           applyConfigToForm(normalizeStreamingConfig(res));
+          setTranscoder(res.transcoder ?? null);
         }
       })
       .catch((error) => {
@@ -128,8 +148,12 @@ export function ConsolePlayback() {
         max_user_transcodes: maxUser,
         idle_timeout_minutes: idleMinutes,
       };
-      const saved = normalizeStreamingConfig(await api.adminSaveStreamingConfig(payload));
+      const savedRes = await api.adminSaveStreamingConfig(payload);
+      const saved = normalizeStreamingConfig(savedRes);
       applyConfigToForm(saved);
+      if (savedRes.transcoder) {
+        setTranscoder(savedRes.transcoder);
+      }
       setSavedLive(true);
     } catch (error) {
       setErr(error instanceof ApiError ? error.message : 'Failed to save playback settings');
@@ -147,8 +171,101 @@ export function ConsolePlayback() {
     );
   }
 
+  const hwActive = Boolean(
+    transcoder?.ffmpeg_available && transcoder.hw_accel && transcoder.hw_accel !== 'software',
+  );
+
   return (
     <form onSubmit={handleSave} className="space-y-6">
+      {/* Hardware Transcoding & Diagnostics Card */}
+      {transcoder && (
+        <div className="rounded-xl bg-surface border border-tone/[0.08] p-5 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-start gap-2.5">
+              <Cpu className="w-4 h-4 text-telemetry shrink-0 mt-0.5" />
+              <div>
+                <h2 className="text-sm font-semibold text-ink">Transcoding Engine & Hardware Acceleration</h2>
+                <p className="text-xs text-ink-secondary mt-0.5">
+                  Detected FFmpeg encoder capabilities and HDR tone-mapping support on this server.
+                </p>
+              </div>
+            </div>
+
+            <span
+              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold shrink-0 self-start sm:self-auto ${
+                !transcoder.ffmpeg_available
+                  ? 'bg-danger/15 border border-danger/30 text-danger'
+                  : hwActive
+                    ? 'bg-healthy/15 border border-healthy/30 text-healthy'
+                    : 'bg-warning/15 border border-warning/30 text-warning'
+              }`}
+            >
+              {transcoder.ffmpeg_available ? (
+                hwActive ? (
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                ) : (
+                  <AlertTriangle className="w-3.5 h-3.5" />
+                )
+              ) : (
+                <AlertTriangle className="w-3.5 h-3.5" />
+              )}
+              {!transcoder.ffmpeg_available
+                ? 'FFmpeg Unavailable'
+                : formatHWAccelBackend(transcoder.hw_accel)}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 text-xs">
+            <div className="rounded-lg bg-canvas/70 border border-tone/[0.08] px-3 py-2.5">
+              <div className="text-[10px] uppercase tracking-wider text-ink-muted">Backend</div>
+              <div className="text-ink font-medium mt-0.5">
+                {transcoder.ffmpeg_available ? formatHWAccelBackend(transcoder.hw_accel) : 'Disabled'}
+              </div>
+            </div>
+
+            <div className="rounded-lg bg-canvas/70 border border-tone/[0.08] px-3 py-2.5">
+              <div className="text-[10px] uppercase tracking-wider text-ink-muted">Render Device</div>
+              <div className="text-ink font-mono text-[11px] mt-0.5 truncate">
+                {transcoder.vaapi_device || '—'}
+              </div>
+            </div>
+
+            <div className="rounded-lg bg-canvas/70 border border-tone/[0.08] px-3 py-2.5">
+              <div className="text-[10px] uppercase tracking-wider text-ink-muted">HDR Tone-Mapping</div>
+              <div className="text-ink font-medium mt-0.5">
+                {transcoder.tonemap_vaapi
+                  ? 'GPU (VA-API)'
+                  : transcoder.hdr_tonemap
+                    ? 'CPU (zscale)'
+                    : 'Unavailable'}
+              </div>
+            </div>
+
+            <div className="rounded-lg bg-canvas/70 border border-tone/[0.08] px-3 py-2.5">
+              <div className="text-[10px] uppercase tracking-wider text-ink-muted">Dolby Vision</div>
+              <div className="text-ink font-medium mt-0.5">
+                {transcoder.libplacebo ? 'libplacebo' : transcoder.tonemap_vaapi || transcoder.hdr_tonemap ? 'HDR Fallback' : 'Unavailable'}
+              </div>
+            </div>
+          </div>
+
+          {transcoder.probe_notes && transcoder.probe_notes.length > 0 && (
+            <div className="rounded-lg bg-canvas/70 border border-tone/[0.08] px-3.5 py-2.5 space-y-1.5">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-ink-muted">
+                Hardware Probe Diagnostics
+              </div>
+              <ul className="space-y-1 font-mono text-[11px] text-ink-secondary">
+                {transcoder.probe_notes.map((note, idx) => (
+                  <li key={idx} className="break-all">
+                    {note}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Transcoding Limits Card */}
       <div className="rounded-xl bg-surface border border-tone/[0.08] p-5 space-y-5">
         <div>

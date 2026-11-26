@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import Hls from 'hls.js';
 import {
   ArrowLeft,
@@ -117,6 +117,7 @@ export function TheaterPlayer({
   onProgressUpdated,
 }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const stageRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const scrubberRef = useRef<HTMLDivElement | null>(null);
   useBodyScrollLock(true);
@@ -134,6 +135,10 @@ export function TheaterPlayer({
   const directFallbackUsedRef = useRef(false);
   const draggingRef = useRef(false);
   const negotiateSeqRef = useRef(0);
+  const shouldAutoPlayRef = useRef(true);
+  const seekDebounceRef = useRef<number | null>(null);
+  const renegotiatingRef = useRef(false);
+  const hlsRef = useRef<Hls | null>(null);
 
   const [detail, setDetail] = useState<MediaItemDetail | null>(null);
   const [nextItem, setNextItem] = useState<MediaItemSummary | null>(null);
@@ -142,6 +147,9 @@ export function TheaterPlayer({
   const [loading, setLoading] = useState(true);
   const [buffering, setBuffering] = useState(false);
   const [error, setError] = useState('');
+  const [playerEngine, setPlayerEngine] = useState<'native' | 'hls.js' | 'safari-hls'>('native');
+  const [decodedResolution, setDecodedResolution] = useState<{ width: number; height: number } | null>(null);
+  const [directFallbackReason, setDirectFallbackReason] = useState('');
 
   // Transport state (currentTime & bufferedEnd are always in ABSOLUTE media seconds)
   const [playing, setPlaying] = useState(false);
@@ -152,6 +160,9 @@ export function TheaterPlayer({
   const [muted, setMuted] = useState<boolean>(readStoredMuted);
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isPiP, setIsPiP] = useState(false);
+  const [stageSize, setStageSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
+  const pipTrackRef = useRef<TextTrack | null>(null);
   const [scrubPreviewSec, setScrubPreviewSec] = useState<number | null>(null);
   const [scrubPreviewPct, setScrubPreviewPct] = useState(0);
   const [droppedFrames, setDroppedFrames] = useState(0);
@@ -164,8 +175,16 @@ export function TheaterPlayer({
   // Modifiable subtitle settings
   const [selectedSubIdx, setSelectedSubIdx] = useState<number | null>(null);
   const [subCues, setSubCues] = useState<Cue[]>([]);
+  const [subStatus, setSubStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [subRetryNonce, setSubRetryNonce] = useState(0);
   const [subSize, setSubSize] = useState<'sm' | 'md' | 'lg'>(readStoredSubSize);
   const [subOffsetSec, setSubOffsetSec] = useState(0);
+  const subTrackKeyRef = useRef<string>('');
+  const subStreamStartRef = useRef<number>(0);
+  const subStreamCompleteRef = useRef<boolean>(false);
+  const subMaxEndRef = useRef<number>(0);
+  const subAbortRef = useRef<AbortController | null>(null);
+  const subStreamGenRef = useRef<number>(0);
 
   // OSD & popovers
   const [osdVisible, setOsdVisible] = useState(true);
@@ -207,6 +226,22 @@ export function TheaterPlayer({
     );
   }, [detail?.video_width, detail?.video_height, initialItem?.video_width, initialItem?.video_height]);
 
+  const teardownActiveStream = useCallback(() => {
+    const h = hlsRef.current;
+    if (h) {
+      hlsRef.current = null;
+      h.destroy();
+    }
+    const v = videoRef.current;
+    if (v) {
+      v.pause();
+      if (!h && planRef.current && planRef.current.mode !== 'direct') {
+        v.removeAttribute('src');
+        v.load();
+      }
+    }
+  }, []);
+
   const stopActiveSession = useCallback(() => {
     const sid = activeSessionIdRef.current ?? planRef.current?.session_id ?? null;
     if (!sid) return;
@@ -216,10 +251,16 @@ export function TheaterPlayer({
 
   const negotiate = useCallback(
     async (opts?: PlaybackOptions, isInitial = false, initialSubOverride?: number | null) => {
+      if (seekDebounceRef.current !== null) {
+        window.clearTimeout(seekDebounceRef.current);
+        seekDebounceRef.current = null;
+      }
       const seq = ++negotiateSeqRef.current;
+      renegotiatingRef.current = !isInitial;
       setLoading(true);
       setError('');
       try {
+        teardownActiveStream();
         stopActiveSession();
         const p = await api.negotiatePlayback(itemId, opts);
         if (!mountedRef.current || seq !== negotiateSeqRef.current) {
@@ -230,8 +271,10 @@ export function TheaterPlayer({
         activeSessionIdRef.current = p.session_id;
         setPlan(p);
         if (p.mode !== 'direct') {
-          setCurrentTime(p.resume_position_ms / 1000);
-          setBufferedEnd(p.resume_position_ms / 1000);
+          const resumeSec = p.resume_position_ms / 1000;
+          currentTimeRef.current = resumeSec;
+          setCurrentTime(resumeSec);
+          setBufferedEnd(resumeSec);
         }
         if (isInitial) {
           if (opts?.audio_stream_index !== undefined) {
@@ -250,16 +293,18 @@ export function TheaterPlayer({
           setBurnSubStreamIdx(p.burn_subtitle_stream_index);
         }
       } catch (err) {
-        if (seq === negotiateSeqRef.current) {
+        if (mountedRef.current && seq === negotiateSeqRef.current) {
+          setBuffering(false);
           setError(err instanceof Error ? err.message : 'Unable to start stream');
         }
       } finally {
         if (mountedRef.current && seq === negotiateSeqRef.current) {
           setLoading(false);
+          renegotiatingRef.current = false;
         }
       }
     },
-    [itemId, stopActiveSession],
+    [itemId, stopActiveSession, teardownActiveStream],
   );
 
   const buildCurrentOpts = useCallback(
@@ -280,12 +325,15 @@ export function TheaterPlayer({
   // Initial load on item change
   useEffect(() => {
     directFallbackUsedRef.current = false;
+    shouldAutoPlayRef.current = true;
+    setDirectFallbackReason('');
+    setDecodedResolution(null);
     setDetail(null);
     setNextItem(null);
     setPlan(null);
     setQualityId('original');
     setSelectedAudioIdx(launchOptions?.audioStreamIndex);
-    setBurnSubStreamIdx(undefined);
+    setBurnSubStreamIdx(launchOptions?.burnSubtitleStreamIndex);
     setSelectedSubIdx(
       launchOptions?.subtitleIndex !== undefined ? launchOptions.subtitleIndex : null,
     );
@@ -320,10 +368,14 @@ export function TheaterPlayer({
     const initialOpts: PlaybackOptions | undefined =
       launchOptions &&
       (launchOptions.audioStreamIndex !== undefined ||
+        launchOptions.burnSubtitleStreamIndex !== undefined ||
         launchOptions.startPositionMS !== undefined)
         ? {
             ...(launchOptions.audioStreamIndex !== undefined
               ? { audio_stream_index: launchOptions.audioStreamIndex }
+              : {}),
+            ...(launchOptions.burnSubtitleStreamIndex !== undefined
+              ? { burn_subtitle_stream_index: launchOptions.burnSubtitleStreamIndex }
               : {}),
             ...(launchOptions.startPositionMS !== undefined
               ? { start_position_ms: launchOptions.startPositionMS }
@@ -338,6 +390,7 @@ export function TheaterPlayer({
     itemId,
     launchOptions?.audioStreamIndex,
     launchOptions?.subtitleIndex,
+    launchOptions?.burnSubtitleStreamIndex,
     launchOptions?.startPositionMS,
     negotiate,
   ]);
@@ -348,54 +401,162 @@ export function TheaterPlayer({
     const video = videoRef.current;
     const offsetSec = plan.mode !== 'direct' ? plan.resume_position_ms / 1000 : 0;
     let hls: Hls | null = null;
+    let disposed = false;
     let mediaRecoveryAttempts = 0;
+    let networkRecoveryAttempts = 0;
+    let networkRetryTimer: number | null = null;
+    let directStartupTimer: number | null = null;
+    let silentAudioChecked = false;
+
+    const isStaleSession = () =>
+      disposed || renegotiatingRef.current || activeSessionIdRef.current !== plan.session_id;
+
+    const destroyHlsInstance = (instance: Hls | null) => {
+      if (!instance) return;
+      if (hlsRef.current === instance) {
+        hlsRef.current = null;
+      }
+      if (hls === instance) {
+        hls = null;
+      }
+      instance.destroy();
+    };
 
     setBuffering(true);
     setError('');
+    setDecodedResolution(null);
+
+    const getAbsoluteTime = () => offsetSec + (Number.isFinite(video.currentTime) ? video.currentTime : 0);
+
+    const triggerDirectFallback = (reason: string) => {
+      if (plan.mode !== 'direct' || !plan.transcode_enabled || directFallbackUsedRef.current) {
+        return false;
+      }
+      directFallbackUsedRef.current = true;
+      setDirectFallbackReason(reason);
+      shouldAutoPlayRef.current = true;
+      const posMS = Math.floor(getAbsoluteTime() * 1000);
+      negotiate(
+        buildCurrentOpts({
+          force_transcode: true,
+          audio_stream_index: plan.selected_audio_index,
+          start_position_ms: posMS > 2000 ? posMS : undefined,
+        }),
+        false,
+      );
+      return true;
+    };
 
     if (plan.mode !== 'direct' && Hls.isSupported()) {
+      setPlayerEngine('hls.js');
       hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
         maxBufferLength: 30,
         maxMaxBufferLength: 60,
-        maxBufferSize: 120 * 1000 * 1000, // 120 MB headroom for 4K remux streams
-        fragLoadingTimeOut: 30000,
-        manifestLoadingTimeOut: 30000,
-        levelLoadingTimeOut: 30000,
+        backBufferLength: 120,
+        maxBufferSize: 180 * 1000 * 1000, // 180 MB headroom for 4K long-GOP remux segments (30–65 MB each)
+        maxBufferHole: 0.5,
+        nudgeOffset: 0.2,
+        nudgeMaxRetry: 5,
+        fragLoadingTimeOut: 60000,
+        manifestLoadingTimeOut: 45000,
+        levelLoadingTimeOut: 45000,
         fragLoadingMaxRetry: 6,
         manifestLoadingMaxRetry: 6,
+        levelLoadingMaxRetry: 4,
+        fragLoadingRetryDelay: 1000,
+        manifestLoadingRetryDelay: 1000,
+        levelLoadingRetryDelay: 1000,
+        fragLoadingMaxRetryTimeout: 10000,
+        manifestLoadingMaxRetryTimeout: 10000,
         startFragPrefetch: true,
       });
+      const hlsInstance = hls;
+      hlsRef.current = hlsInstance;
 
-      hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (!data.fatal || !hls) return;
+      hlsInstance.on(Hls.Events.ERROR, (_event, data) => {
+        if (!data.fatal || isStaleSession() || hlsRef.current !== hlsInstance) return;
+        const httpCode = data.response?.code;
         if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
-          hls.startLoad();
+          if (httpCode === 429) {
+            setBuffering(false);
+            setError('Too many concurrent transcode sessions. Please try again shortly.');
+            destroyHlsInstance(hlsInstance);
+            return;
+          }
+          if (httpCode === 501) {
+            setBuffering(false);
+            setError('Server transcoding is unavailable (FFmpeg not configured).');
+            destroyHlsInstance(hlsInstance);
+            return;
+          }
+          if (httpCode === 401 || httpCode === 403) {
+            setBuffering(false);
+            setError('Stream session expired or was stopped. Click Retry to resume.');
+            destroyHlsInstance(hlsInstance);
+            return;
+          }
+          if (httpCode === 404 || httpCode === 410) {
+            setBuffering(false);
+            setError('Stream segment unavailable. Click Retry to restart playback.');
+            destroyHlsInstance(hlsInstance);
+            return;
+          }
+          if (networkRecoveryAttempts < 4) {
+            networkRecoveryAttempts += 1;
+            if (networkRetryTimer !== null) window.clearTimeout(networkRetryTimer);
+            networkRetryTimer = window.setTimeout(() => {
+              networkRetryTimer = null;
+              if (!isStaleSession() && hlsRef.current === hlsInstance) {
+                hlsInstance.startLoad();
+              }
+            }, 1000);
+            return;
+          }
+          setBuffering(false);
+          setError(`Network error loading stream (${data.details || httpCode || 'timeout'}). Click Retry to reconnect.`);
+          destroyHlsInstance(hlsInstance);
         } else if (data.type === Hls.ErrorTypes.MEDIA_ERROR && mediaRecoveryAttempts < 2) {
           mediaRecoveryAttempts += 1;
-          hls.recoverMediaError();
+          if (mediaRecoveryAttempts === 2) {
+            hlsInstance.swapAudioCodec();
+          }
+          hlsInstance.recoverMediaError();
         } else {
           setBuffering(false);
           setError(`Stream playback error (${data.details || data.type}). Try retrying or lowering quality.`);
-          hls.destroy();
-          hls = null;
+          destroyHlsInstance(hlsInstance);
         }
       });
 
-      hls.loadSource(plan.stream_url);
-      hls.attachMedia(video);
+      hlsInstance.loadSource(plan.stream_url);
+      hlsInstance.attachMedia(video);
     } else {
+      setPlayerEngine(plan.mode === 'direct' ? 'native' : 'safari-hls');
       video.src = plan.stream_url;
+      if (plan.mode === 'direct' && plan.transcode_enabled && !directFallbackUsedRef.current) {
+        directStartupTimer = window.setTimeout(() => {
+          directStartupTimer = null;
+          if (!isStaleSession() && video.readyState === 0) {
+            triggerDirectFallback('Direct Play stalled during startup');
+          }
+        }, 10000);
+      }
     }
 
     video.volume = volume;
     video.muted = muted;
     video.playbackRate = playbackRate;
 
-    const getAbsoluteTime = () => offsetSec + (Number.isFinite(video.currentTime) ? video.currentTime : 0);
-
     const onLoaded = () => {
+      if (directStartupTimer !== null) {
+        window.clearTimeout(directStartupTimer);
+        directStartupTimer = null;
+      }
+      if (video.videoWidth > 0 && video.videoHeight > 0) {
+        setDecodedResolution({ width: video.videoWidth, height: video.videoHeight });
+      }
       if (Number.isFinite(video.duration) && video.duration > 0) {
         setMediaDuration(offsetSec + video.duration);
       }
@@ -406,13 +567,25 @@ export function TheaterPlayer({
       ) {
         video.currentTime = plan.resume_position_ms / 1000;
       }
-      video.play().catch(() => {});
+      if (shouldAutoPlayRef.current) {
+        video.play().catch(() => {});
+      } else {
+        setBuffering(false);
+        setPlaying(false);
+      }
     };
 
     const onTime = () => {
       if (draggingRef.current) return;
       const abs = getAbsoluteTime();
       setCurrentTime(abs);
+      if (video.videoWidth > 0 && video.videoHeight > 0) {
+        setDecodedResolution((prev) =>
+          prev && prev.width === video.videoWidth && prev.height === video.videoHeight
+            ? prev
+            : { width: video.videoWidth, height: video.videoHeight },
+        );
+      }
       if (video.buffered.length > 0) {
         setBufferedEnd(offsetSec + video.buffered.end(video.buffered.length - 1));
       }
@@ -422,33 +595,81 @@ export function TheaterPlayer({
           setDroppedFrames(q.droppedVideoFrames);
         }
       }
+      // Detect Direct Play loading video-only with silent/unsupported audio.
+      if (
+        !silentAudioChecked &&
+        plan.mode === 'direct' &&
+        plan.transcode_enabled &&
+        !directFallbackUsedRef.current &&
+        (plan.audio_tracks?.length ?? 0) > 0 &&
+        !video.paused &&
+        video.currentTime > 2
+      ) {
+        silentAudioChecked = true;
+        const vAny = video as HTMLVideoElement & {
+          mozHasAudio?: boolean;
+          webkitAudioDecodedByteCount?: number;
+          audioTracks?: { length: number };
+        };
+        const noMozAudio = vAny.mozHasAudio === false;
+        const noWebKitAudio =
+          typeof vAny.webkitAudioDecodedByteCount === 'number' &&
+          vAny.webkitAudioDecodedByteCount === 0 &&
+          !video.muted &&
+          video.volume > 0;
+        const noSafariAudioTracks =
+          vAny.audioTracks !== undefined && vAny.audioTracks.length === 0;
+        if (noMozAudio || noWebKitAudio || noSafariAudioTracks) {
+          triggerDirectFallback('Unsupported audio track in Direct Play');
+        }
+      }
     };
 
-    const onPlay = () => setPlaying(true);
+    const onPlay = () => {
+      shouldAutoPlayRef.current = true;
+      setPlaying(true);
+    };
     const onPlaying = () => {
+      networkRecoveryAttempts = 0;
+      shouldAutoPlayRef.current = true;
       setPlaying(true);
       setBuffering(false);
     };
-    const onCanPlay = () => setBuffering(false);
+    const onCanPlay = () => {
+      if (directStartupTimer !== null) {
+        window.clearTimeout(directStartupTimer);
+        directStartupTimer = null;
+      }
+      if (shouldAutoPlayRef.current && video.paused && !isStaleSession()) {
+        video.play().catch(() => {});
+      }
+      setBuffering(false);
+    };
     const onWaiting = () => setBuffering(true);
     const onPause = () => {
+      if (isStaleSession()) return;
+      if (!video.ended) {
+        shouldAutoPlayRef.current = false;
+      }
       setPlaying(false);
       setOsdVisible(true);
+      const abs = getAbsoluteTime();
+      if (abs > 0 && !video.ended) {
+        api
+          .updateProgress(itemId, Math.floor(abs * 1000))
+          .then(() => onProgressUpdatedRef.current())
+          .catch(() => {});
+      }
     };
 
     const onVideoError = () => {
+      if (directStartupTimer !== null) {
+        window.clearTimeout(directStartupTimer);
+        directStartupTimer = null;
+      }
+      if (isStaleSession()) return;
       // Automatic Direct Play -> Transcode fallback if browser canPlayType() was overly optimistic.
-      if (plan.mode === 'direct' && plan.transcode_enabled && !directFallbackUsedRef.current) {
-        directFallbackUsedRef.current = true;
-        const posMS = Math.floor(getAbsoluteTime() * 1000);
-        negotiate(
-          {
-            force_transcode: true,
-            audio_stream_index: plan.selected_audio_index,
-            start_position_ms: posMS > 2000 ? posMS : undefined,
-          },
-          false,
-        );
+      if (triggerDirectFallback('Browser failed to decode Direct Play stream')) {
         return;
       }
       setBuffering(false);
@@ -486,18 +707,18 @@ export function TheaterPlayer({
     video.addEventListener('ended', onEnded);
 
     const progressTimer = window.setInterval(() => {
-      if (!video.paused) {
+      if (!video.paused && !isStaleSession()) {
         const abs = getAbsoluteTime();
         if (abs > 0) {
           api
             .updateProgress(itemId, Math.floor(abs * 1000), undefined, plan.session_id)
             .then((prog) => {
+              if (isStaleSession()) return;
               if (prog.session_stopped) {
                 activeSessionIdRef.current = null;
                 video.pause();
                 if (hls) {
-                  hls.destroy();
-                  hls = null;
+                  destroyHlsInstance(hls);
                 } else {
                   video.removeAttribute('src');
                   video.load();
@@ -514,7 +735,10 @@ export function TheaterPlayer({
     }, 5000);
 
     return () => {
+      disposed = true;
       window.clearInterval(progressTimer);
+      if (networkRetryTimer !== null) window.clearTimeout(networkRetryTimer);
+      if (directStartupTimer !== null) window.clearTimeout(directStartupTimer);
       video.removeEventListener('loadedmetadata', onLoaded);
       video.removeEventListener('timeupdate', onTime);
       video.removeEventListener('play', onPlay);
@@ -526,14 +750,21 @@ export function TheaterPlayer({
       video.removeEventListener('error', onVideoError);
       video.removeEventListener('ended', onEnded);
       const abs = getAbsoluteTime();
-      if (abs > 0 && !video.ended) {
+      if (
+        abs > 0 &&
+        !video.ended &&
+        !renegotiatingRef.current &&
+        activeSessionIdRef.current === plan.session_id
+      ) {
         api
           .updateProgress(itemId, Math.floor(abs * 1000))
           .then(() => onProgressUpdatedRef.current())
           .catch(() => {});
       }
       if (hls) {
-        hls.destroy();
+        if (hlsRef.current === hls) {
+          destroyHlsInstance(hls);
+        }
       } else {
         video.removeAttribute('src');
         video.load();
@@ -553,36 +784,178 @@ export function TheaterPlayer({
     return () => {
       mountedRef.current = false;
       negotiateSeqRef.current += 1;
+      if (seekDebounceRef.current !== null) {
+        window.clearTimeout(seekDebounceRef.current);
+        seekDebounceRef.current = null;
+      }
       window.removeEventListener('pagehide', handleUnload);
       window.removeEventListener('beforeunload', handleUnload);
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+      if (subAbortRef.current) {
+        subAbortRef.current.abort();
+        subAbortRef.current = null;
+      }
       stopActiveSession();
     };
   }, [stopActiveSession]);
 
-  // Load and parse WebVTT subtitle cues whenever selected text subtitle track changes
-  useEffect(() => {
-    if (selectedSubIdx === null || !plan) {
-      setSubCues([]);
-      return;
-    }
-    const track = (plan.subtitles ?? []).find((s) => s.index === selectedSubIdx);
-    if (!track || track.requires_burn_in || !track.url) {
-      setSubCues([]);
-      return;
-    }
-    let active = true;
-    fetch(track.url)
-      .then((r) => (r.ok ? r.text() : ''))
-      .then((vtt) => {
-        if (active) setSubCues(parseWebVTT(vtt));
-      })
-      .catch(() => {
-        if (active) setSubCues([]);
-      });
-    return () => {
-      active = false;
-    };
+  // Load and progressively stream WebVTT subtitle cues whenever selected text subtitle track changes.
+  // For embedded tracks in large MKVs, the server streams WebVTT chunks progressively (and supports ?start=<sec>
+  // fast seeking) so cues appear in <1.5s instead of blocking until the entire multi-GB file is read.
+  // We avoid killing & restarting the subtitle stream on every video seek if the track is already loaded or
+  // streaming over the current playback position, preventing competing SMB I/O during seeks.
+  const selectedSubTrack = useMemo(() => {
+    if (selectedSubIdx === null || !plan) return null;
+    const tr = (plan.subtitles ?? []).find((s) => s.index === selectedSubIdx);
+    if (!tr || tr.requires_burn_in || !tr.url) return null;
+    return tr;
   }, [selectedSubIdx, plan]);
+
+  const planResumeSec = plan ? plan.resume_position_ms / 1000 : 0;
+
+  useEffect(() => {
+    if (!selectedSubTrack || !selectedSubTrack.url) {
+      subStreamGenRef.current += 1;
+      if (subAbortRef.current) {
+        subAbortRef.current.abort();
+        subAbortRef.current = null;
+      }
+      subTrackKeyRef.current = '';
+      subStreamStartRef.current = 0;
+      subStreamCompleteRef.current = false;
+      subMaxEndRef.current = 0;
+      setSubCues([]);
+      setSubStatus('idle');
+      return;
+    }
+
+    const trackKey = `${itemId}:${selectedSubTrack.index}:${selectedSubTrack.stream_index ?? 'sidecar'}:${subRetryNonce}`;
+    const isEmbedded = selectedSubTrack.url.includes('/embedded-');
+    const targetSec = Math.max(0, currentTimeRef.current || planResumeSec);
+    const sameTrack = subTrackKeyRef.current === trackKey;
+
+    if (sameTrack) {
+      // Already fetched the entire track from 0:00 (or sidecar): never re-fetch on seek.
+      if (subStreamCompleteRef.current && subStreamStartRef.current <= 0) {
+        return;
+      }
+      // Existing continuous stream already covers the seek target: keep it running uninterrupted.
+      if (
+        targetSec >= subStreamStartRef.current &&
+        (subStreamCompleteRef.current || (subAbortRef.current !== null && targetSec <= subMaxEndRef.current + 30))
+      ) {
+        return;
+      }
+    }
+
+    // Abort any previous subtitle stream only when switching tracks or jumping outside the loaded range.
+    const gen = ++subStreamGenRef.current;
+    if (subAbortRef.current) {
+      subAbortRef.current.abort();
+    }
+    const controller = new AbortController();
+    subAbortRef.current = controller;
+
+    const startSec = isEmbedded && targetSec > 15 ? Math.max(0, Math.floor(targetSec - 10)) : 0;
+    let fetchUrl = selectedSubTrack.url;
+    if (startSec > 0) {
+      fetchUrl += (fetchUrl.includes('?') ? '&' : '?') + `start=${startSec}`;
+    }
+
+    subTrackKeyRef.current = trackKey;
+    subStreamStartRef.current = startSec;
+    subStreamCompleteRef.current = false;
+    subMaxEndRef.current = startSec;
+    if (!sameTrack) {
+      setSubCues([]);
+    }
+    setSubStatus('loading');
+
+    const isCurrent = () => mountedRef.current && subStreamGenRef.current === gen;
+
+    const mergeCues = (existing: Cue[], incoming: Cue[]): Cue[] => {
+      if (incoming.length === 0) return existing;
+      for (const c of incoming) {
+        if (c.end > subMaxEndRef.current) subMaxEndRef.current = c.end;
+      }
+      if (existing.length === 0) return incoming;
+      const seen = new Set(existing.map((c) => `${c.start.toFixed(2)}:${c.end.toFixed(2)}:${c.text}`));
+      const merged = existing.slice();
+      for (const c of incoming) {
+        const k = `${c.start.toFixed(2)}:${c.end.toFixed(2)}:${c.text}`;
+        if (!seen.has(k)) {
+          seen.add(k);
+          merged.push(c);
+        }
+      }
+      return merged;
+    };
+
+    (async () => {
+      try {
+        const res = await fetch(fetchUrl, { signal: controller.signal });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.body) {
+          const vtt = await res.text();
+          if (!isCurrent()) return;
+          const parsed = parseWebVTT(vtt);
+          setSubCues((prev) => (sameTrack ? mergeCues(prev, parsed) : parsed));
+          subStreamCompleteRef.current = true;
+          if (subAbortRef.current === controller) subAbortRef.current = null;
+          setSubStatus('ready');
+          return;
+        }
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let pending = '';
+        let markedReady = false;
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (!isCurrent()) return;
+          if (value) {
+            pending += decoder.decode(value, { stream: true }).replace(/\r\n/g, '\n');
+            const sepIdx = pending.lastIndexOf('\n\n');
+            if (sepIdx !== -1) {
+              const complete = pending.slice(0, sepIdx);
+              pending = pending.slice(sepIdx + 2);
+              const parsed = parseWebVTT(complete);
+              if (parsed.length > 0) {
+                setSubCues((prev) => mergeCues(prev, parsed));
+              }
+              if (!markedReady && (parsed.length > 0 || complete.includes('WEBVTT'))) {
+                markedReady = true;
+                setSubStatus('ready');
+              }
+            }
+          }
+          if (done) break;
+        }
+
+        const tail = (pending + decoder.decode()).trim();
+        if (tail && isCurrent()) {
+          const parsed = parseWebVTT(tail);
+          if (parsed.length > 0) {
+            setSubCues((prev) => mergeCues(prev, parsed));
+          }
+        }
+        if (isCurrent()) {
+          subStreamCompleteRef.current = true;
+          if (subAbortRef.current === controller) subAbortRef.current = null;
+          setSubStatus('ready');
+        }
+      } catch (err) {
+        if (!isCurrent() || (err instanceof DOMException && err.name === 'AbortError')) return;
+        if (subAbortRef.current === controller) subAbortRef.current = null;
+        if (!sameTrack) {
+          setSubCues([]);
+        }
+        setSubStatus('error');
+      }
+    })();
+  }, [itemId, selectedSubTrack, planResumeSec, subRetryNonce]);
 
   // Up Next countdown
   useEffect(() => {
@@ -597,12 +970,79 @@ export function TheaterPlayer({
     return () => window.clearTimeout(timer);
   }, [upNextCountdown, nextItem, onSelectItem]);
 
-  // Track fullscreen changes
+  // Track fullscreen & Picture-in-Picture changes
   useEffect(() => {
     const onFsChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
     document.addEventListener('fullscreenchange', onFsChange);
     return () => document.removeEventListener('fullscreenchange', onFsChange);
   }, []);
+
+  // Track video stage dimensions so subtitles stay cleanly inside the active picture (above letterbox bars)
+  useEffect(() => {
+    const el = stageRef.current;
+    if (!el) return;
+    const update = () => {
+      const rect = el.getBoundingClientRect();
+      setStageSize((prev) =>
+        prev.width === rect.width && prev.height === rect.height
+          ? prev
+          : { width: rect.width, height: rect.height },
+      );
+    };
+    update();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', update);
+      return () => window.removeEventListener('resize', update);
+    }
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const onEnterPiP = () => setIsPiP(true);
+    const onLeavePiP = () => setIsPiP(false);
+    video.addEventListener('enterpictureinpicture', onEnterPiP);
+    video.addEventListener('leavepictureinpicture', onLeavePiP);
+    return () => {
+      video.removeEventListener('enterpictureinpicture', onEnterPiP);
+      video.removeEventListener('leavepictureinpicture', onLeavePiP);
+    };
+  }, []);
+
+  // Mirror parsed subtitle cues into a native TextTrack ONLY while in Picture-in-Picture,
+  // keeping normal and fullscreen playback 100% driven by Lune's custom styled overlay.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || typeof VTTCue === 'undefined') return;
+    if (!isPiP || selectedSubIdx === null || subCues.length === 0) {
+      if (pipTrackRef.current) {
+        pipTrackRef.current.mode = 'hidden';
+      }
+      return;
+    }
+    let track = pipTrackRef.current;
+    if (!track) {
+      track = video.addTextTrack('subtitles', 'Subtitles', selectedSubTrack?.language || 'en');
+      pipTrackRef.current = track;
+    }
+    while (track.cues && track.cues.length > 0) {
+      track.removeCue(track.cues[0]);
+    }
+    for (const c of subCues) {
+      const localStart = c.start + subOffsetSec - streamOffsetSec;
+      const localEnd = c.end + subOffsetSec - streamOffsetSec;
+      if (localEnd <= 0 || localEnd <= localStart) continue;
+      try {
+        track.addCue(new VTTCue(Math.max(0, localStart), localEnd, c.text));
+      } catch {
+        // ignore invalid cue ranges
+      }
+    }
+    track.mode = 'showing';
+  }, [isPiP, selectedSubIdx, selectedSubTrack?.language, subCues, subOffsetSec, streamOffsetSec]);
 
   // Auto-hide OSD on idle while playing
   const wakeOSD = useCallback(() => {
@@ -635,14 +1075,20 @@ export function TheaterPlayer({
 
   // True seeking across both Direct Play and server-side HLS remux/transcode sessions.
   const seekTo = useCallback(
-    (targetSec: number) => {
+    (targetSec: number, immediate = false) => {
       const v = videoRef.current;
       const activePlan = planRef.current;
       if (!v || !activePlan) return;
       const maxDur = durationRef.current || v.duration || 0;
       const clamped = Math.max(0, maxDur > 0 ? Math.min(maxDur, targetSec) : targetSec);
+      // Update ref synchronously so rapid ArrowRight/ArrowLeft presses accumulate cleanly.
+      currentTimeRef.current = clamped;
 
       if (activePlan.mode === 'direct') {
+        if (seekDebounceRef.current !== null) {
+          window.clearTimeout(seekDebounceRef.current);
+          seekDebounceRef.current = null;
+        }
         v.currentTime = clamped;
         setCurrentTime(clamped);
         wakeOSD();
@@ -655,18 +1101,34 @@ export function TheaterPlayer({
 
       // If target falls inside the already-transcoded HLS window, seek instantaneously on the client.
       if (localTarget >= 0 && playableLocalEnd > 0 && localTarget <= playableLocalEnd - 1.5) {
+        if (seekDebounceRef.current !== null) {
+          window.clearTimeout(seekDebounceRef.current);
+          seekDebounceRef.current = null;
+        }
         v.currentTime = localTarget;
         setCurrentTime(clamped);
         wakeOSD();
         return;
       }
 
-      // Otherwise trigger an instant server-side FFmpeg input seek (-ss).
+      // Scrubber release seeks immediately; keyboard skips debounce briefly (150ms) so rapid taps coalesce.
+      shouldAutoPlayRef.current = !v.paused || loading || buffering || shouldAutoPlayRef.current;
       setCurrentTime(clamped);
-      negotiate(buildCurrentOpts({ start_position_ms: Math.floor(clamped * 1000) }));
+      if (seekDebounceRef.current !== null) {
+        window.clearTimeout(seekDebounceRef.current);
+        seekDebounceRef.current = null;
+      }
+      if (immediate) {
+        negotiate(buildCurrentOpts({ start_position_ms: Math.floor(clamped * 1000) }));
+      } else {
+        seekDebounceRef.current = window.setTimeout(() => {
+          seekDebounceRef.current = null;
+          negotiate(buildCurrentOpts({ start_position_ms: Math.floor(clamped * 1000) }));
+        }, 150);
+      }
       wakeOSD();
     },
-    [buildCurrentOpts, negotiate, wakeOSD],
+    [buffering, buildCurrentOpts, loading, negotiate, wakeOSD],
   );
 
   const seekBy = useCallback(
@@ -885,6 +1347,7 @@ export function TheaterPlayer({
   ]);
 
   function handleQualityChange(preset: QualityPreset) {
+    shouldAutoPlayRef.current = videoRef.current ? !videoRef.current.paused || buffering : true;
     setQualityId(preset.id);
     const posMS = Math.floor(currentTimeRef.current * 1000);
     negotiate({
@@ -898,12 +1361,14 @@ export function TheaterPlayer({
     setOpenMenu('none');
   }
 
-  function handleAudioChange(idx: number | undefined) {
+  function handleAudioChange(idx: number | undefined, burnOverride?: number | undefined, clearBurn = false) {
+    shouldAutoPlayRef.current = videoRef.current ? !videoRef.current.paused || buffering : true;
     setSelectedAudioIdx(idx);
     const posMS = Math.floor(currentTimeRef.current * 1000);
     negotiate(
       buildCurrentOpts({
         audio_stream_index: idx,
+        ...(clearBurn ? { burn_subtitle_stream_index: burnOverride } : {}),
         start_position_ms: posMS,
       }),
     );
@@ -914,6 +1379,7 @@ export function TheaterPlayer({
     if (!sub) {
       setSelectedSubIdx(null);
       if (burnSubStreamIdx !== undefined) {
+        shouldAutoPlayRef.current = videoRef.current ? !videoRef.current.paused || buffering : true;
         setBurnSubStreamIdx(undefined);
         negotiate(
           buildCurrentOpts({
@@ -926,6 +1392,7 @@ export function TheaterPlayer({
     }
 
     if (sub.requires_burn_in && sub.stream_index !== undefined) {
+      shouldAutoPlayRef.current = videoRef.current ? !videoRef.current.paused || buffering : true;
       setSelectedSubIdx(sub.index);
       setBurnSubStreamIdx(sub.stream_index);
       setSubCues([]);
@@ -941,6 +1408,7 @@ export function TheaterPlayer({
 
     setSelectedSubIdx(sub.index);
     if (burnSubStreamIdx !== undefined) {
+      shouldAutoPlayRef.current = videoRef.current ? !videoRef.current.paused || buffering : true;
       setBurnSubStreamIdx(undefined);
       negotiate(
         buildCurrentOpts({
@@ -998,7 +1466,11 @@ export function TheaterPlayer({
         subs.find((s) => !s.forced);
       setSelectedSubIdx(fullEn ? fullEn.index : null);
     }
-    handleAudioChange(targetAudio.index);
+    const hadBurnIn = burnSubStreamIdx !== undefined;
+    if (hadBurnIn) {
+      setBurnSubStreamIdx(undefined);
+    }
+    handleAudioChange(targetAudio.index, undefined, hadBurnIn);
   }
 
   // Scrubber pointer drag + hover preview handlers
@@ -1036,7 +1508,7 @@ export function TheaterPlayer({
       e.currentTarget.releasePointerCapture(e.pointerId);
     }
     const ratio = ratioFromClientX(e.clientX);
-    seekTo(ratio * duration);
+    seekTo(ratio * duration, true);
   };
 
   // Active subtitle cues adjusted by user sync offset (uses true absolute currentTime!)
@@ -1071,10 +1543,33 @@ export function TheaterPlayer({
   const subSizeClass =
     subSize === 'sm' ? 'text-base sm:text-lg' : subSize === 'lg' ? 'text-2xl sm:text-3xl' : 'text-lg sm:text-2xl';
 
+  // Keep subtitles cleanly inside the rendered video frame instead of dipping into bottom letterbox bars.
+  const subtitleBottomPx = useMemo(() => {
+    const vidW = decodedResolution?.width || detail?.video_width || initialItem?.video_width || 0;
+    const vidH = decodedResolution?.height || detail?.video_height || initialItem?.video_height || 0;
+    let letterboxBottom = 0;
+    if (stageSize.width > 0 && stageSize.height > 0 && vidW > 0 && vidH > 0) {
+      const renderedH = Math.min(stageSize.height, stageSize.width / (vidW / vidH));
+      letterboxBottom = Math.max(0, Math.round((stageSize.height - renderedH) / 2));
+    }
+    const insideFrame = letterboxBottom + 32;
+    return osdVisible ? Math.max(112, insideFrame) : Math.max(48, insideFrame);
+  }, [
+    decodedResolution?.width,
+    decodedResolution?.height,
+    detail?.video_width,
+    detail?.video_height,
+    initialItem?.video_width,
+    initialItem?.video_height,
+    stageSize.width,
+    stageSize.height,
+    osdVisible,
+  ]);
+
   const modeBadgeLabel = useMemo(() => {
     if (!plan) return '';
     if (plan.mode === 'direct') return 'Direct Play';
-    if (plan.mode === 'remux') return plan.audio_copy ? 'Direct Stream' : 'HLS Remux';
+    if (plan.mode === 'remux') return plan.audio_copy ? 'Direct Stream' : 'Direct Stream · Audio Transcode';
     return plan.hw_accel && plan.hw_accel !== 'software'
       ? `Transcode · ${plan.hw_accel.toUpperCase()}`
       : 'Transcode';
@@ -1091,6 +1586,7 @@ export function TheaterPlayer({
     >
       {/* Video Stage */}
       <div
+        ref={stageRef}
         className="relative flex-1 w-full h-full flex items-center justify-center overflow-hidden"
         onClick={() => {
           if (openMenu !== 'none') {
@@ -1104,15 +1600,7 @@ export function TheaterPlayer({
         <video ref={videoRef} className="w-full h-full object-contain" playsInline />
 
         {/* Loading / Buffering / Error State */}
-        {loading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/60 pointer-events-none">
-            <div className="flex items-center gap-3 text-sm text-ink">
-              <img src="/lune-mark.svg" alt="Lune" className="w-7 h-7 animate-pulse" />
-              <span>Negotiating stream…</span>
-            </div>
-          </div>
-        )}
-        {!loading && buffering && !error && (
+        {(loading || buffering) && !error && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
             <div className="rounded-full bg-canvas/70 backdrop-blur-md border border-white/12 p-3.5 shadow-2xl">
               <Loader2 className="w-6 h-6 text-ink animate-spin" />
@@ -1156,15 +1644,14 @@ export function TheaterPlayer({
         {/* Custom Styled Subtitle Overlay (supports live size & sync offset) */}
         {activeCueText && (
           <div
-            className={`absolute inset-x-6 pointer-events-none flex justify-center transition-all duration-200 ${
-              osdVisible ? 'bottom-28' : 'bottom-10'
-            }`}
+            style={{ bottom: `${subtitleBottomPx}px` }}
+            className="absolute inset-x-6 pointer-events-none flex justify-center transition-[bottom] duration-200"
           >
             <div
               className={`${subSizeClass} font-medium text-ink text-center whitespace-pre-line px-4 py-1.5 rounded-lg bg-canvas/75 backdrop-blur-xs shadow-lg max-w-3xl leading-snug`}
               style={{ textShadow: '0 2px 6px rgba(0,0,0,0.9)' }}
             >
-              {activeCueText}
+              {renderFormattedSubtitle(activeCueText)}
             </div>
           </div>
         )}
@@ -1191,12 +1678,33 @@ export function TheaterPlayer({
             <div>
               Pipeline:{' '}
               <span className="text-ink">
-                Video {plan.video_copy ? 'Copy' : `Encode (${plan.hw_accel || 'software'})`} · Audio{' '}
-                {plan.audio_copy ? 'Copy' : 'AAC'}
+                Video {plan.video_copy ? 'Copy' : 'Transcode'} · Audio{' '}
+                {plan.audio_copy ? 'Copy' : 'Transcode (AAC)'}
               </span>
             </div>
+            {plan.mode === 'transcode' && (
+              <div>
+                HW Accel:{' '}
+                <span className="text-ink">{formatHWAccelLabel(plan.hw_accel)}</span>
+              </div>
+            )}
             <div>
               Reason: <span className="text-ink">{plan.reason}</span>
+            </div>
+            {directFallbackReason && (
+              <div>
+                Fallback: <span className="text-warning">{directFallbackReason}</span>
+              </div>
+            )}
+            <div>
+              Player:{' '}
+              <span className="text-ink">
+                {playerEngine === 'hls.js'
+                  ? 'hls.js (fMP4 MSE)'
+                  : playerEngine === 'safari-hls'
+                    ? 'Safari Native HLS'
+                    : 'Native <video>'}
+              </span>
             </div>
             <div>
               Container: <span className="text-ink">{detail?.container || initialItem?.container || '—'}</span>
@@ -1206,9 +1714,17 @@ export function TheaterPlayer({
               <span className="text-ink">
                 {(detail?.video_codec || initialItem?.video_codec || '—').toUpperCase()}
                 {detail?.video_width ? ` ${detail.video_width}×${detail.video_height}` : ''}
-                {detail?.video_hdr && detail.video_hdr !== 'sdr' ? ` · ${detail.video_hdr.toUpperCase()}` : ''}
+                {detail?.video_hdr && detail.video_hdr !== 'sdr' ? ` · ${formatHDRLabel(detail.video_hdr)}` : ''}
               </span>
             </div>
+            {decodedResolution && (
+              <div>
+                Output Video:{' '}
+                <span className="text-ink">
+                  {decodedResolution.width}×{decodedResolution.height}
+                </span>
+              </div>
+            )}
             <div>
               Source Audio:{' '}
               <span className="text-ink">
@@ -1216,6 +1732,11 @@ export function TheaterPlayer({
                 {activeAudioTrack?.channels ? ` ${activeAudioTrack.channels}ch` : ''}
               </span>
             </div>
+            {plan.burn_subtitle_stream_index !== undefined && (
+              <div>
+                Subtitles: <span className="text-warning">Burn-in (stream #{plan.burn_subtitle_stream_index})</span>
+              </div>
+            )}
             {detail?.bitrate ? (
               <div>
                 Source Bitrate: <span className="text-ink">{(detail.bitrate / 1_000_000).toFixed(1)} Mbps</span>
@@ -1538,6 +2059,24 @@ export function TheaterPlayer({
                           </p>
                         )}
                       </div>
+                      {subStatus === 'loading' && (
+                        <div className="mt-2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface/80 text-[11px] text-ink-secondary">
+                          <Loader2 className="w-3 h-3 animate-spin text-telemetry shrink-0" />
+                          <span>Extracting subtitles…</span>
+                        </div>
+                      )}
+                      {subStatus === 'error' && (
+                        <div className="mt-2 flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-warning/10 border border-warning/25 text-[11px] text-warning">
+                          <span>Subtitle extraction timed out or failed.</span>
+                          <button
+                            type="button"
+                            onClick={() => setSubRetryNonce((n) => n + 1)}
+                            className="underline hover:text-ink shrink-0 cursor-pointer"
+                          >
+                            Retry
+                          </button>
+                        </div>
+                      )}
                     </div>
 
                     {/* Subtitle Size */}
@@ -1756,6 +2295,37 @@ export function TheaterPlayer({
   );
 }
 
+function formatHDRLabel(hdr: string): string {
+  switch (hdr.toLowerCase()) {
+    case 'dovi_hdr10':
+      return 'DV · HDR10';
+    case 'dovi':
+      return 'DV';
+    case 'hdr10plus':
+      return 'HDR10+';
+    default:
+      return hdr.toUpperCase();
+  }
+}
+
+function formatHWAccelLabel(hw?: string): string {
+  switch ((hw ?? '').toLowerCase()) {
+    case 'vaapi':
+      return 'VA-API (GPU)';
+    case 'qsv':
+      return 'Intel QSV (GPU)';
+    case 'nvenc':
+      return 'NVIDIA NVENC (GPU)';
+    case 'videotoolbox':
+      return 'Apple VideoToolbox (GPU)';
+    case 'software':
+    case '':
+      return 'Software (CPU · libx264)';
+    default:
+      return hw ?? 'Software';
+  }
+}
+
 function formatSubBadge(format: string): string {
   switch (format.toLowerCase()) {
     case 'subrip':
@@ -1799,15 +2369,55 @@ function parseWebVTT(vtt: string): Cue[] {
     const [startRaw, endRaw] = lines[timeIdx].split('-->').map((s) => s.trim().split(/\s+/)[0]);
     const start = parseVTTTime(startRaw);
     const end = parseVTTTime(endRaw);
-    const text = lines
-      .slice(timeIdx + 1)
-      .join('\n')
-      .replace(/<[^>]+>/g, '');
+    const text = decodeVTTEscaped(
+      lines
+        .slice(timeIdx + 1)
+        .join('\n')
+        .replace(/<(?!\/?(?:i|b|u)\b)[^>]+>/gi, ''),
+    );
     if (text && Number.isFinite(start) && Number.isFinite(end)) {
       cues.push({ start, end, text });
     }
   }
   return cues;
+}
+
+function decodeVTTEscaped(s: string): string {
+  return s
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'");
+}
+
+function renderFormattedSubtitle(text: string): ReactNode {
+  if (!/<\/?(?:i|b|u)>/i.test(text)) return text;
+  const tokens = text.split(/(<\/?(?:i|b|u)>)/gi);
+  const stack: string[] = [];
+  const out: ReactNode[] = [];
+  for (let i = 0; i < tokens.length; i++) {
+    const tok = tokens[i];
+    if (!tok) continue;
+    const open = tok.match(/^<(i|b|u)>$/i);
+    if (open) {
+      stack.push(open[1].toLowerCase());
+      continue;
+    }
+    const close = tok.match(/^<\/(i|b|u)>$/i);
+    if (close) {
+      const idx = stack.lastIndexOf(close[1].toLowerCase());
+      if (idx !== -1) stack.splice(idx, 1);
+      continue;
+    }
+    let node: ReactNode = tok;
+    if (stack.includes('u')) node = <span className="underline">{node}</span>;
+    if (stack.includes('b')) node = <strong className="font-semibold">{node}</strong>;
+    if (stack.includes('i')) node = <em className="italic">{node}</em>;
+    out.push(<span key={i}>{node}</span>);
+  }
+  return out;
 }
 
 function parseVTTTime(raw: string): number {

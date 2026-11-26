@@ -320,7 +320,7 @@ export function ConsoleOverview({
 
         {streams.length === 0 ? (
           <div className="rounded-lg bg-canvas/60 border border-tone/[0.06] px-4 py-6 text-center text-xs text-ink-secondary">
-            No active streams right now. Active Direct Play, remux, and transcoded sessions will appear here.
+            No active streams right now. Active Direct Play, Direct Stream, and transcoded sessions will appear here.
           </div>
         ) : (
           <div className="divide-y divide-tone/[0.08]">
@@ -331,13 +331,19 @@ export function ConsoleOverview({
                   : st.mode === 'remux'
                     ? 'bg-telemetry/15 text-telemetry'
                     : 'bg-warning/15 text-warning';
+              const modeLabel =
+                st.mode === 'direct'
+                  ? 'Direct Play'
+                  : st.mode === 'remux'
+                    ? 'Direct Stream'
+                    : 'Transcode';
               return (
                 <div key={st.session_id} className="py-3 flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-sm font-medium text-ink truncate">{st.item_title}</span>
                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium uppercase tracking-wide ${modeBadge}`}>
-                        {st.mode}
+                        {modeLabel}
                       </span>
                     </div>
                     <div className="text-xs tabular-nums text-ink-secondary mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
