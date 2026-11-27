@@ -441,7 +441,7 @@ export function ConsoleMaintenance() {
           <div className="rounded-lg bg-canvas/50 border border-tone/[0.06] p-3.5 space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-ink-secondary">
               <span className="font-medium text-ink">
-                Last Pass Summary ({lastRun.trigger === 'manual' ? 'Manual' : 'Scheduled'}
+                Last Pass Summary ({lastRun.trigger === 'manual' ? 'Manual' : lastRun.trigger === 'resume' ? 'Resumed' : 'Scheduled'}
                 {lastRun.task && lastRun.task in TASK_LABELS
                   ? ` · ${TASK_LABELS[lastRun.task as MaintenanceTask]}`
                   : ''}
@@ -453,9 +453,11 @@ export function ConsoleMaintenance() {
                     Artwork sweep skipped (library scan in progress)
                   </span>
                 )}
-                {lastRun.skipped_chapters_busy && (
+                {(lastRun.skipped_chapters_busy || status?.chapters_resume_pending) && (
                   <span className="text-warning">
-                    Chapter stills paused (scan or stream active)
+                    {status?.chapters_resume_pending
+                      ? 'Chapter stills paused, resumes automatically once playback ends'
+                      : 'Chapter stills paused (scan or stream active)'}
                   </span>
                 )}
               </div>
@@ -520,6 +522,14 @@ export function ConsoleMaintenance() {
                     {(lastRun.chapter_thumbnails_missing_files ?? 0) > 0
                       ? `${lastRun.chapter_thumbnails_missing_files} offline`
                       : ''}
+                  </span>
+                )}
+                {(lastRun.chapter_thumbnails_failed ?? 0) > 0 && (
+                  <span
+                    className="block text-[10px] text-ink-muted"
+                    title="FFmpeg could not read a frame at these chapters. They are skipped until the file changes."
+                  >
+                    {lastRun.chapter_thumbnails_failed} unreadable
                   </span>
                 )}
               </div>

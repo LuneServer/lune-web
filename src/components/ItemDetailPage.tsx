@@ -139,7 +139,10 @@ function ChapterCard({
   onSelect: () => void;
 }) {
   const [imgError, setImgError] = useState(false);
-  const src = chapter.thumbnail_url ? `${chapter.thumbnail_url}${bustSuffix}` : '';
+  // Server still URLs already carry ?v=<mtime>; join any extra bust param with '&'.
+  const src = chapter.thumbnail_url
+    ? `${chapter.thumbnail_url}${bustSuffix && chapter.thumbnail_url.includes('?') ? bustSuffix.replace('?', '&') : bustSuffix}`
+    : '';
   const showImage = Boolean(src) && !imgError;
   const timecode = formatChapterTimecode(chapter.start_ms);
   const kindBadge = formatChapterKindBadge(chapter.kind);
