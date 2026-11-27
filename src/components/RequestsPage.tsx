@@ -474,6 +474,9 @@ export function RequestsPage({
         const results = Array.isArray(res.results) ? res.results : [];
         setPage(res.page || targetPage);
         setTotalPages(res.total_pages || 1);
+        // Reset poster batching in the same commit as the new results so the
+        // previous results are never re-sliced (and re-laid out) mid-fetch.
+        if (!append) setPosterBatches(1);
         setDiscoverItems((prev) => (append ? [...prev, ...results] : results));
       } catch (err) {
         if (controller.signal.aborted) return;
@@ -490,7 +493,6 @@ export function RequestsPage({
 
   useEffect(() => {
     if (activeTab !== 'discover') return;
-    setPosterBatches(1);
     loadDiscover(1, false);
     return () => {
       searchAbortRef.current?.abort();
@@ -1036,7 +1038,7 @@ export function RequestsPage({
             </div>
           )}
 
-          {discoverLoading ? (
+          {discoverLoading && filteredDiscoverItems.length === 0 ? (
             <div className="py-16 flex items-center justify-center gap-2 text-xs text-ink-secondary">
               <Loader2 className="w-4 h-4 animate-spin" />
               Loading titles…
@@ -1079,7 +1081,15 @@ export function RequestsPage({
               )}
             </div>
           ) : (
-            <>
+            // Keep the previous results mounted (dimmed) while a category/filter
+            // change is fetching, so the grid swaps straight to the new results
+            // instead of collapsing to a loading row and re-expanding.
+            <div
+              aria-busy={discoverLoading}
+              className={`space-y-6 transition-opacity duration-150 ${
+                discoverLoading ? 'opacity-50 pointer-events-none' : ''
+              }`}
+            >
               {viewMode === 'list' ? (
                 <div className="flex flex-col gap-2">
                   {filteredDiscoverItems.map((item) => {
@@ -1331,7 +1341,7 @@ export function RequestsPage({
                   </button>
                 </div>
               )}
-            </>
+            </div>
           )}
         </div>
       )}
