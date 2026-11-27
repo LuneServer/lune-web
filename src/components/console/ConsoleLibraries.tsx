@@ -29,6 +29,35 @@ export function ConsoleLibraries({ libraries, onLibrariesChanged, onRefreshTelem
     return () => window.clearInterval(timer);
   }, [hasRunningScan]);
 
+  // Scans started from this page run asynchronously; once the polled status
+  // reports one finished, auto-expand its error panel if it reported errors.
+  const watchedScansRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const watched = watchedScansRef.current;
+    if (watched.size === 0) return;
+    for (const lib of libraries) {
+      if (!watched.has(lib.id) || !lib.scan || lib.scan.running) continue;
+      watched.delete(lib.id);
+      if (lib.scan.errors > 0) {
+        setExpandedErrors((prev) => new Set(prev).add(lib.id));
+      }
+    }
+  }, [libraries]);
+
+  // Start a scan without waiting for it to finish, then refetch libraries
+  // straight away so the "scanning" pill shows and status polling starts.
+  async function startScan(id: string, force: boolean) {
+    try {
+      const st = await api.scanLibrary(id, false, force);
+      if (st.running) watchedScansRef.current.add(id);
+    } catch (err) {
+      // A scan already in progress is fine: refetching surfaces its status.
+      if (!(err instanceof ApiError)) throw err;
+    }
+    onLibrariesChanged();
+    onRefreshTelemetry();
+  }
+
   function toggleErrors(id: string) {
     setExpandedErrors((prev) => {
       const next = new Set(prev);
@@ -59,12 +88,7 @@ export function ConsoleLibraries({ libraries, onLibrariesChanged, onRefreshTelem
 
     setBusyID(lib.id);
     try {
-      const scanRes = await api.scanLibrary(lib.id, true).catch(() => null);
-      if (scanRes && scanRes.errors > 0) {
-        setExpandedErrors((prev) => new Set(prev).add(lib.id));
-      }
-      onLibrariesChanged();
-      onRefreshTelemetry();
+      await startScan(lib.id, false).catch(() => undefined);
     } finally {
       setBusyID('');
     }
@@ -73,12 +97,7 @@ export function ConsoleLibraries({ libraries, onLibrariesChanged, onRefreshTelem
   async function handleScan(id: string, force = false) {
     setBusyID(id);
     try {
-      const scanRes = await api.scanLibrary(id, true, force);
-      if (scanRes.errors > 0) {
-        setExpandedErrors((prev) => new Set(prev).add(id));
-      }
-      onLibrariesChanged();
-      onRefreshTelemetry();
+      await startScan(id, force);
     } finally {
       setBusyID('');
     }
@@ -200,17 +219,19 @@ export function ConsoleLibraries({ libraries, onLibrariesChanged, onRefreshTelem
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  disabled={busyID === lib.id}
+                  disabled={busyID === lib.id || lib.scan?.running}
                   onClick={() => handleScan(lib.id, false)}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-elevated hover:bg-hairline text-xs font-medium text-ink px-3 py-1.5 transition-colors cursor-pointer"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${busyID === lib.id ? 'animate-spin' : ''}`} />
+                  <RefreshCw
+                    className={`w-3.5 h-3.5 ${busyID === lib.id || lib.scan?.running ? 'animate-spin' : ''}`}
+                  />
                   Scan
                 </button>
                 <button
                   type="button"
                   title="Re-probe and refresh metadata for all items in this library"
-                  disabled={busyID === lib.id}
+                  disabled={busyID === lib.id || lib.scan?.running}
                   onClick={() => handleScan(lib.id, true)}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-canvas border border-hairline hover:border-accent/60 text-xs font-medium text-ink px-3 py-1.5 transition-colors cursor-pointer"
                 >
