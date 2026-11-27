@@ -81,7 +81,7 @@ lune-web/
             ├── ConsoleInvites.tsx    # Expiring invite link creation (with role/library scoping & canonical public_url origin), one-time link copy, and revocation
             ├── ConsolePlayback.tsx   # Hardware transcoding & FFmpeg probe diagnostics (`transcoder` status, HW accel backend, render device, HDR/DoVi tone-mapping) + live playback & transcoding limits settings (server-wide & per-user concurrent transcode caps, idle transcode timeout)
             ├── ConsoleNetwork.tsx    # Access mode & networking settings (Entirely Local, Built-in ACME HTTPS + Cloudflare DNS-01, Reverse Proxy, Tailscale), LAN-only Admin Console switch, IP allowlist/blocklist, and active IP ban management
-            ├── ConsoleMaintenance.tsx # Periodic housekeeping status, last-run metrics (including chapter stills generated), manual "Run Maintenance Now", and live-editable schedule/task retention & chapter stills settings
+            ├── ConsoleMaintenance.tsx # Periodic housekeeping status, last-run metrics (including chapter stills generated/unreadable, "Resumed" passes, and an auto-resume notice while `chapters_resume_pending`), manual "Run Maintenance Now", and live-editable schedule/task retention & chapter stills settings
             ├── ConsoleActivity.tsx   # Searchable & filterable security/activity audit log
             └── auditUtils.ts         # Shared audit event categorization and alert detection helpers
 ```

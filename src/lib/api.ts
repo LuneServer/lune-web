@@ -102,7 +102,7 @@ export interface MaintenanceRunReport {
   started_at: string;
   finished_at: string;
   duration_ms: number;
-  trigger: 'scheduled' | 'manual' | string;
+  trigger: 'scheduled' | 'manual' | 'resume' | string;
   task?: MaintenanceTask | string;
   canceled?: boolean;
   skipped_artwork_scan_busy?: boolean;
@@ -117,6 +117,8 @@ export interface MaintenanceRunReport {
   chapter_thumbnails_existing?: number;
   chapter_thumbnails_total?: number;
   chapter_thumbnails_missing_files?: number;
+  /** Chapters FFmpeg could not extract; skipped until the file changes. */
+  chapter_thumbnails_failed?: number;
   errors?: string[];
 }
 
@@ -127,6 +129,8 @@ export interface MaintenanceStatus {
   last_run?: MaintenanceRunReport;
   next_run_at?: string;
   server_timezone?: string;
+  /** True while chapter still generation is paused and will resume once playback/scans end. */
+  chapters_resume_pending?: boolean;
 }
 
 export interface HealthStatus {
