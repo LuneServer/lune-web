@@ -273,6 +273,56 @@ function gridKeyFor(v: View, search: string, sort: SortOption, filters: LibraryF
   }
 }
 
+/** Page size for infinitely scrolled library/discover item grids (server max is 200). */
+const GRID_PAGE_SIZE = 120;
+
+type ListItemsParams = NonNullable<Parameters<typeof api.listItems>[0]>;
+
+/**
+ * Query behind a paginated item grid (Library or Discover), or null when the view has no
+ * paginated `/api/v1/items` grid (e.g. a `shows` library, which lists series only).
+ * Anime libraries ask for `kind: 'movie'` so episodes don't consume the page budget.
+ */
+function pagedItemsQuery(
+  v: View,
+  filters: LibraryFilters,
+  sort: SortOption,
+  libs: Library[],
+): ListItemsParams | null {
+  if (v.kind === 'discover') {
+    const fp =
+      v.filterKind === 'genre'
+        ? { genre: v.value }
+        : v.filterKind === 'studio'
+          ? { studio: v.value }
+          : { person: v.value };
+    return { ...fp, sort };
+  }
+  if (v.kind === 'library') {
+    const lib = libs.find((l) => l.id === v.libraryId);
+    if (lib?.kind === 'shows') return null;
+    return {
+      library_id: v.libraryId,
+      ...(lib?.kind === 'anime' ? { kind: 'movie' } : {}),
+      ...filters,
+      sort,
+    };
+  }
+  return null;
+}
+
+/** Appends a fetched page, dropping episodes and any rows already present (offset drift on concurrent scans). */
+function appendGridItems(prev: MediaItemSummary[], page: MediaItemSummary[]): MediaItemSummary[] {
+  const seen = new Set(prev.map((m) => m.id));
+  const next = prev.slice();
+  for (const m of page) {
+    if (m.kind === 'episode' || seen.has(m.id)) continue;
+    seen.add(m.id);
+    next.push(m);
+  }
+  return next;
+}
+
 interface LuneHistoryState {
   lune?: boolean;
   entryId?: number;
@@ -340,7 +390,15 @@ export function App() {
     key: string;
     series: SeriesSummary[];
     items: MediaItemSummary[];
+    /** Server `total` for the paginated item query; undefined for unpaginated grids. */
+    itemsTotal?: number;
+    /** Raw rows fetched so far, used as the next page's `offset`. */
+    itemsOffset?: number;
   }>({ key: '', series: [], items: [] });
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadMoreFailed, setLoadMoreFailed] = useState(false);
+  const loadMoreInFlightRef = useRef<string | null>(null);
+  const loadMoreSentinelRef = useRef<HTMLDivElement>(null);
   const [animeFilter, setAnimeFilter] = useState<'all' | 'series' | 'movies'>('all');
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [showPrefs, setShowPrefs] = useState(false);
@@ -716,23 +774,25 @@ export function App() {
       if (view.kind === 'discover' && gKey) {
         if (!force && viewCache.isGridFresh(gKey)) {
           const cached = viewCache.getGrid(gKey);
-          if (cached) setGridState({ key: gKey, series: cached.series, items: cached.items });
+          if (cached) setGridState({ key: gKey, ...cached });
           return;
         }
-        const filterParams =
-          view.filterKind === 'genre'
-            ? { genre: view.value }
-            : view.filterKind === 'studio'
-              ? { studio: view.value }
-              : { person: view.value };
+        const itemsQuery = pagedItemsQuery(view, filters, sort, libs)!;
         const [sRes, iRes] = await Promise.all([
-          api.listSeries({ ...filterParams, sort }, signal).catch(() => ({ series: [] })),
-          api.listItems({ ...filterParams, sort, limit: 120 }, signal).catch(() => ({ items: [], total: 0 })),
+          api.listSeries(itemsQuery, signal).catch(() => ({ series: [] })),
+          api
+            .listItems({ ...itemsQuery, limit: GRID_PAGE_SIZE }, signal)
+            .catch(() => ({ items: [], total: 0 })),
         ]);
         if (signal?.aborted) return;
-        const items = iRes.items.filter((m) => m.kind !== 'episode');
-        viewCache.setGrid(gKey, { series: sRes.series, items });
-        setGridState({ key: gKey, series: sRes.series, items });
+        const grid = {
+          series: sRes.series,
+          items: appendGridItems([], iRes.items),
+          itemsTotal: iRes.total,
+          itemsOffset: iRes.items.length,
+        };
+        viewCache.setGrid(gKey, grid);
+        setGridState({ key: gKey, ...grid });
         return;
       }
 
@@ -754,7 +814,13 @@ export function App() {
         if (!force && viewCache.isGridFresh(gKey)) {
           const cached = viewCache.getGrid(gKey);
           if (cached) {
-            setGridState({ key: gKey, series: cached.series, items: cached.items });
+            setGridState({
+              key: gKey,
+              series: cached.series,
+              items: cached.items,
+              itemsTotal: cached.itemsTotal,
+              itemsOffset: cached.itemsOffset,
+            });
             if (cached.favorites) setFavoriteItems(cached.favorites);
           }
           return;
@@ -773,19 +839,25 @@ export function App() {
           setGridState({ key: gKey, series: sRes.series, items: [] });
           setFavoriteItems(favRes.items);
         } else {
+          const itemsQuery = pagedItemsQuery(view, filters, sort, libs)!;
           const [sRes, iRes, favRes] = await Promise.all([
             api
               .listSeries({ library_id: view.libraryId, ...filters, sort }, signal)
               .catch(() => ({ series: [] })),
             api
-              .listItems({ library_id: view.libraryId, ...filters, sort, limit: 120 }, signal)
+              .listItems({ ...itemsQuery, limit: GRID_PAGE_SIZE }, signal)
               .catch(() => ({ items: [], total: 0 })),
             favPromise,
           ]);
           if (signal?.aborted) return;
-          const items = iRes.items.filter((m) => m.kind !== 'episode');
-          viewCache.setGrid(gKey, { series: sRes.series, items, favorites: favRes.items });
-          setGridState({ key: gKey, series: sRes.series, items });
+          const grid = {
+            series: sRes.series,
+            items: appendGridItems([], iRes.items),
+            itemsTotal: iRes.total,
+            itemsOffset: iRes.items.length,
+          };
+          viewCache.setGrid(gKey, { ...grid, favorites: favRes.items });
+          setGridState({ key: gKey, ...grid });
           setFavoriteItems(favRes.items);
         }
       }
@@ -798,6 +870,70 @@ export function App() {
     loadData({ signal: controller.signal });
     return () => controller.abort();
   }, [loadData]);
+
+  // Infinite scroll: fetch the next `/api/v1/items` page for the active Library/Discover grid.
+  const gridHasMore =
+    gridState.itemsTotal !== undefined &&
+    (gridState.itemsOffset ?? 0) < gridState.itemsTotal &&
+    gridState.key === gridKeyFor(view, search, sort, filters);
+
+  const loadMoreGridItems = useCallback(async () => {
+    const key = gridKeyFor(view, search, sort, filters);
+    if (!key || key !== gridState.key || loadMoreInFlightRef.current === key) return;
+    const offset = gridState.itemsOffset ?? 0;
+    if (gridState.itemsTotal === undefined || offset >= gridState.itemsTotal) return;
+    const query = pagedItemsQuery(view, filters, sort, libraries);
+    if (!query) return;
+    loadMoreInFlightRef.current = key;
+    setLoadingMore(true);
+    setLoadMoreFailed(false);
+    try {
+      const res = await api.listItems({ ...query, limit: GRID_PAGE_SIZE, offset });
+      setGridState((prev) => {
+        if (prev.key !== key || (prev.itemsOffset ?? 0) !== offset) return prev;
+        const next = {
+          ...prev,
+          items: appendGridItems(prev.items, res.items),
+          itemsTotal: res.total,
+          // An empty page means the total shrank underneath us; stop paging.
+          itemsOffset: res.items.length > 0 ? offset + res.items.length : res.total,
+        };
+        const cached = viewCache.getGrid(key);
+        viewCache.setGrid(key, {
+          series: next.series,
+          items: next.items,
+          favorites: cached?.favorites,
+          itemsTotal: next.itemsTotal,
+          itemsOffset: next.itemsOffset,
+        });
+        return next;
+      });
+    } catch {
+      // Stop auto-paging until the user retries, so a failing server isn't hammered in a loop.
+      setLoadMoreFailed(true);
+    } finally {
+      if (loadMoreInFlightRef.current === key) loadMoreInFlightRef.current = null;
+      setLoadingMore(false);
+    }
+  }, [view, search, sort, filters, libraries, gridState.key, gridState.itemsOffset, gridState.itemsTotal]);
+
+  useEffect(() => {
+    const el = loadMoreSentinelRef.current;
+    if (!el || !gridHasMore || loadingMore || loadMoreFailed) return;
+    // Re-created after every page so a sentinel still in view immediately triggers the next page.
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) loadMoreGridItems();
+      },
+      { rootMargin: '1200px 0px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [gridHasMore, loadingMore, loadMoreFailed, loadMoreGridItems]);
+
+  useEffect(() => {
+    setLoadMoreFailed(false);
+  }, [gridState.key]);
 
   // Mark cached views stale on mutations; only refetch immediately if the active view needs it.
   const handleCatalogMutated = useCallback(() => {
@@ -920,6 +1056,31 @@ export function App() {
 
   const activeLibrary =
     view.kind === 'library' ? libraries.find((l) => l.id === view.libraryId) ?? null : null;
+
+  // Footer under paginated grids: an IntersectionObserver sentinel, a spinner while fetching,
+  // and a manual retry if a page failed. Hidden on the anime "Series" tab (items aren't shown).
+  const gridLoadMoreFooter =
+    gridHasMore && !(activeLibrary?.kind === 'anime' && animeFilter === 'series') ? (
+      <div ref={loadMoreSentinelRef} className="flex justify-center py-8 text-xs text-ink-secondary">
+        {loadMoreFailed ? (
+          <button
+            type="button"
+            onClick={() => loadMoreGridItems()}
+            className="rounded-lg bg-surface border border-hairline hover:border-tone/35 px-3 py-1.5 font-medium text-ink transition-colors cursor-pointer"
+          >
+            Couldn’t load more titles — Retry
+          </button>
+        ) : (
+          <span
+            aria-live="polite"
+            className={`inline-flex items-center gap-2 transition-opacity ${loadingMore ? 'opacity-100' : 'opacity-0'}`}
+          >
+            <span className="w-3.5 h-3.5 rounded-full border-2 border-tone/20 border-t-tone/70 animate-spin" />
+            Loading more…
+          </span>
+        )}
+      </div>
+    ) : null;
   const activeFacets: LibraryFacets | null =
     view.kind === 'library'
       ? facetsState.libraryId === view.libraryId
@@ -1890,8 +2051,10 @@ export function App() {
                     </div>
                     <h1 className="text-xl font-semibold text-ink tracking-tight">{view.value}</h1>
                     <div className="text-xs tabular-nums text-ink-secondary">
-                      {libSeries.length + libItems.length}{' '}
-                      {libSeries.length + libItems.length === 1 ? 'title' : 'titles'} in your library
+                      {libSeries.length + libItems.length}
+                      {gridHasMore ? '+' : ''}{' '}
+                      {libSeries.length + libItems.length === 1 && !gridHasMore ? 'title' : 'titles'} in your
+                      library
                     </div>
                   </div>
                 </div>
@@ -1968,6 +2131,7 @@ export function App() {
                   ))}
                 </div>
               )}
+              {gridLoadMoreFooter}
             </div>
           )}
 
@@ -1991,7 +2155,13 @@ export function App() {
                                 ? `${libSeries.length} ${libSeries.length === 1 ? 'series' : 'series'}`
                                 : null,
                               libItems.length > 0
-                                ? `${libItems.length} ${libItems.length === 1 ? 'film' : 'films'}`
+                                ? (() => {
+                                    const films =
+                                      (gridState.key === activeGridKey
+                                        ? gridState.itemsTotal
+                                        : cachedGrid?.itemsTotal) ?? libItems.length;
+                                    return `${films} ${films === 1 ? 'film' : 'films'}`;
+                                  })()
                                 : null,
                               `${activeLibrary.item_count} ${activeLibrary.item_count === 1 ? 'file' : 'files'}`,
                             ]
@@ -2163,6 +2333,7 @@ export function App() {
                   </div>
                 );
               })()}
+              {gridLoadMoreFooter}
             </div>
           )}
         </main>
