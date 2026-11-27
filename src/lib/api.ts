@@ -134,6 +134,16 @@ export interface MaintenanceRunReport {
   /** Total on-disk size of all current scrubbing preview sets. */
   trickplay_bytes?: number;
   errors?: string[];
+  /** Overall result; `skipped` means nothing requested could run (older servers omit it). */
+  outcome?: 'completed' | 'partial' | 'skipped' | 'canceled' | string;
+  /** Tasks that did not run or yielded part-way, with a human-readable reason. */
+  skipped?: MaintenanceSkippedTask[];
+}
+
+export interface MaintenanceSkippedTask {
+  task: MaintenanceTask | string;
+  /** e.g. "Library scan in progress", "Playback in progress", "FFmpeg not available". */
+  reason: string;
 }
 
 export interface MaintenanceStatus {

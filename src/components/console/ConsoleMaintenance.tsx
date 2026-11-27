@@ -15,6 +15,7 @@ import {
   formatBytes,
   type MaintenanceConfig,
   type MaintenanceStatus,
+  type MaintenanceRunReport,
   type MaintenanceTask,
 } from '../../lib/api';
 
@@ -26,6 +27,34 @@ const TASK_LABELS: Record<MaintenanceTask, string> = {
   trickplay: 'Scrubbing Previews',
   optimize_db: 'SQLite Optimization',
 };
+
+function taskLabel(task: string): string {
+  return task in TASK_LABELS ? TASK_LABELS[task as MaintenanceTask] : task;
+}
+
+/** Skipped tasks reported by the server, falling back to legacy busy flags for older servers. */
+function skippedTasks(run: MaintenanceRunReport): { task: string; reason: string }[] {
+  if (run.skipped) return run.skipped;
+  const out: { task: string; reason: string }[] = [];
+  if (run.skipped_artwork_scan_busy) out.push({ task: 'artwork', reason: 'Library scan in progress' });
+  if (run.skipped_chapters_busy) out.push({ task: 'chapter_thumbnails', reason: 'Scan or playback in progress' });
+  if (run.skipped_trickplay_busy) out.push({ task: 'trickplay', reason: 'Scan or playback in progress' });
+  return out;
+}
+
+/** One-line result for a manual run, never claiming success for a task that did not run. */
+function describeRun(label: string, run: MaintenanceRunReport | undefined): { text: string; warn: boolean } {
+  if (!run) return { text: `${label} completed.`, warn: false };
+  if (run.canceled || run.outcome === 'canceled') return { text: `${label} canceled.`, warn: true };
+  const skipped = skippedTasks(run);
+  if (skipped.length === 0) return { text: `${label} completed.`, warn: false };
+  const reasons = skipped.map((s) => `${taskLabel(s.task)}: ${s.reason}`).join('; ');
+  const allSkipped = run.outcome ? run.outcome === 'skipped' : Boolean(run.task);
+  return {
+    text: allSkipped ? `${label} skipped (${reasons}).` : `${label} finished with skipped tasks (${reasons}).`,
+    warn: true,
+  };
+}
 
 const DEFAULT_CONFIG: MaintenanceConfig = {
   enabled: true,
@@ -122,6 +151,7 @@ export function ConsoleMaintenance() {
   const [canceling, setCanceling] = useState(false);
   const [err, setErr] = useState('');
   const [feedback, setFeedback] = useState('');
+  const [feedbackWarn, setFeedbackWarn] = useState(false);
 
   function hydrate(next: MaintenanceStatus) {
     setStatus(next);
@@ -264,6 +294,7 @@ export function ConsoleMaintenance() {
       };
       const updated = await api.adminSaveMaintenanceConfig(payload);
       hydrate(updated);
+      setFeedbackWarn(false);
       setFeedback('Maintenance settings saved and rescheduled live.');
     } catch (error) {
       setErr(error instanceof ApiError ? error.message : 'Failed to save maintenance settings');
@@ -286,7 +317,9 @@ export function ConsoleMaintenance() {
       // Preserve any unsaved form draft edits; only refresh live status and last-run report.
       setStatus(updated);
       const label = task ? TASK_LABELS[task] : 'Housekeeping pass';
-      setFeedback(updated.last_run?.canceled ? `${label} canceled.` : `${label} completed.`);
+      const result = describeRun(label, updated.last_run);
+      setFeedback(result.text);
+      setFeedbackWarn(result.warn);
     } catch (error) {
       setErr(error instanceof ApiError ? error.message : 'Failed to run maintenance');
     } finally {
@@ -456,14 +489,17 @@ export function ConsoleMaintenance() {
                 {lastRun.task && lastRun.task in TASK_LABELS
                   ? ` · ${TASK_LABELS[lastRun.task as MaintenanceTask]}`
                   : ''}
-                {lastRun.canceled ? ' · Canceled' : ''})
+                {lastRun.canceled ? ' · Canceled' : lastRun.outcome === 'skipped' ? ' · Skipped' : ''})
               </span>
               <div className="flex flex-wrap items-center gap-3">
-                {lastRun.skipped_artwork_scan_busy && (
-                  <span className="text-warning">
-                    Artwork sweep skipped (library scan in progress)
-                  </span>
-                )}
+                {skippedTasks(lastRun)
+                  // Chapter stills and scrubbing previews have their own messages below.
+                  .filter((s) => s.task !== 'chapter_thumbnails' && s.task !== 'trickplay')
+                  .map((s) => (
+                    <span key={s.task} className="text-warning">
+                      {taskLabel(s.task)} skipped ({s.reason})
+                    </span>
+                  ))}
                 {lastRun.skipped_trickplay_busy && (
                   <span className="text-warning">
                     Scrubbing previews paused too long (playback never stopped); next pass continues
@@ -481,7 +517,10 @@ export function ConsoleMaintenance() {
                   <span className="text-warning">
                     {status?.chapters_resume_pending
                       ? 'Chapter stills paused, resumes automatically once playback ends'
-                      : 'Chapter stills paused (scan or stream active)'}
+                      : `Chapter stills paused (${
+                          skippedTasks(lastRun).find((s) => s.task === 'chapter_thumbnails')?.reason ??
+                          'scan or playback active'
+                        })`}
                   </span>
                 )}
               </div>
@@ -1067,8 +1106,19 @@ export function ConsoleMaintenance() {
           )}
 
           {feedback && (
-            <div className="rounded-lg bg-healthy/10 border border-healthy/25 px-3.5 py-2.5 text-xs text-healthy flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <div
+              role="status"
+              className={
+                feedbackWarn
+                  ? 'rounded-lg bg-warning/10 border border-warning/25 px-3.5 py-2.5 text-xs text-warning flex items-center gap-2'
+                  : 'rounded-lg bg-healthy/10 border border-healthy/25 px-3.5 py-2.5 text-xs text-healthy flex items-center gap-2'
+              }
+            >
+              {feedbackWarn ? (
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+              )}
               <span>{feedback}</span>
             </div>
           )}
