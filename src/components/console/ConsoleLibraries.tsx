@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { FolderPlus, RefreshCw, Trash2 } from 'lucide-react';
 import { api, ApiError, type Library } from '../../lib/api';
 
@@ -13,8 +13,21 @@ export function ConsoleLibraries({ libraries, onLibrariesChanged, onRefreshTelem
   const [kind, setKind] = useState<Library['kind']>('movies');
   const [rootPath, setRootPath] = useState('');
   const [formErr, setFormErr] = useState('');
+  const [creating, setCreating] = useState(false);
   const [busyID, setBusyID] = useState('');
   const [expandedErrors, setExpandedErrors] = useState<Set<string>>(new Set());
+
+  const hasRunningScan = libraries.some((l) => l.scan?.running);
+  const onLibrariesChangedRef = useRef(onLibrariesChanged);
+  onLibrariesChangedRef.current = onLibrariesChanged;
+
+  useEffect(() => {
+    if (!hasRunningScan) return;
+    const timer = window.setInterval(() => {
+      onLibrariesChangedRef.current();
+    }, 2500);
+    return () => window.clearInterval(timer);
+  }, [hasRunningScan]);
 
   function toggleErrors(id: string) {
     setExpandedErrors((prev) => {
@@ -27,19 +40,33 @@ export function ConsoleLibraries({ libraries, onLibrariesChanged, onRefreshTelem
 
   async function handleAddLibrary(e: FormEvent) {
     e.preventDefault();
+    if (creating) return;
     setFormErr('');
+    setCreating(true);
+    let lib: Library;
     try {
-      const lib = await api.createLibrary({ name, kind, root_path: rootPath });
+      lib = await api.createLibrary({ name, kind, root_path: rootPath });
       setName('');
       setRootPath('');
+      onLibrariesChanged();
+      onRefreshTelemetry();
+    } catch (err) {
+      setFormErr(err instanceof ApiError ? err.message : 'Failed to register library');
+      return;
+    } finally {
+      setCreating(false);
+    }
+
+    setBusyID(lib.id);
+    try {
       const scanRes = await api.scanLibrary(lib.id, true).catch(() => null);
       if (scanRes && scanRes.errors > 0) {
         setExpandedErrors((prev) => new Set(prev).add(lib.id));
       }
       onLibrariesChanged();
       onRefreshTelemetry();
-    } catch (err) {
-      setFormErr(err instanceof ApiError ? err.message : 'Failed to register library');
+    } finally {
+      setBusyID('');
     }
   }
 
@@ -115,10 +142,11 @@ export function ConsoleLibraries({ libraries, onLibrariesChanged, onRefreshTelem
         />
         <button
           type="submit"
-          className="md:col-span-2 inline-flex items-center justify-center gap-1.5 rounded-lg bg-accent hover:bg-accent-hover text-on-accent font-semibold text-sm px-3 py-2 transition-colors cursor-pointer"
+          disabled={creating}
+          className="md:col-span-2 inline-flex items-center justify-center gap-1.5 rounded-lg bg-accent hover:bg-accent-hover disabled:opacity-50 disabled:pointer-events-none text-on-accent font-semibold text-sm px-3 py-2 transition-colors cursor-pointer"
         >
           <FolderPlus className="w-4 h-4" />
-          Add &amp; Scan
+          {creating ? 'Adding…' : 'Add & Scan'}
         </button>
       </form>
 
