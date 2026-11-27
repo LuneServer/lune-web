@@ -78,6 +78,12 @@ export interface MaintenanceConfig {
   audit_retention_days: number;
   optimize_database: boolean;
   generate_chapter_thumbnails: boolean;
+  /** Scrubbing preview sprite sheets (keyframe-only). Server default: false. */
+  generate_trickplay?: boolean;
+  /** Seconds between preview thumbnails (2–60, default 10). */
+  trickplay_interval_seconds?: number;
+  /** Preview thumbnail width in px (even, 160–480, default 320). */
+  trickplay_width?: number;
 }
 
 export type MaintenanceTask =
@@ -85,6 +91,7 @@ export type MaintenanceTask =
   | 'transcode_cache'
   | 'audit'
   | 'chapter_thumbnails'
+  | 'trickplay'
   | 'optimize_db';
 
 export interface MaintenanceProgress {
@@ -119,6 +126,13 @@ export interface MaintenanceRunReport {
   chapter_thumbnails_missing_files?: number;
   /** Chapters FFmpeg could not extract; skipped until the file changes. */
   chapter_thumbnails_failed?: number;
+  skipped_trickplay_busy?: boolean;
+  trickplay_generated?: number;
+  trickplay_existing?: number;
+  trickplay_total?: number;
+  trickplay_failed?: number;
+  /** Total on-disk size of all current scrubbing preview sets. */
+  trickplay_bytes?: number;
   errors?: string[];
 }
 
@@ -392,6 +406,24 @@ export interface SubtitleStream {
   url: string;
 }
 
+/**
+ * Each sheet is a `columns` x `rows` grid of `thumb_width` x `thumb_height` tiles in row-major
+ * order; tile n lives on sheet n/(columns*rows). Tile n starts at `timestamps_ms[n]` when the
+ * server dropped near-duplicate tiles, otherwise at n*interval_ms, and lasts until the next tile.
+ */
+export interface TrickplayInfo {
+  /** Sheet image format: avif (default on most servers), webp, or jpg. */
+  format?: 'avif' | 'webp' | 'jpg';
+  timestamps_ms?: number[];
+  interval_ms: number;
+  thumb_width: number;
+  thumb_height: number;
+  columns: number;
+  rows: number;
+  thumb_count: number;
+  sheet_urls: string[];
+}
+
 export interface PlaybackPlan {
   session_id: string;
   item_id: string;
@@ -408,6 +440,8 @@ export interface PlaybackPlan {
   selected_subtitle_index?: number;
   burn_subtitle_stream_index?: number;
   chapters?: ChapterInfo[];
+  /** Scrubbing preview sprite sheets, present once maintenance has generated them. */
+  trickplay?: TrickplayInfo;
   transcode_enabled: boolean;
   resume_position_ms: number;
   duration_ms: number;
