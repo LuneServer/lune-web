@@ -16,7 +16,6 @@ import {
   PictureInPicture2,
   Info,
   Check,
-  Radio,
   FastForward,
   Languages,
   List,
@@ -1968,12 +1967,6 @@ export function TheaterPlayer({
               <ArrowLeft className="w-5 h-5" />
             </button>
             <span className="text-sm sm:text-base font-medium text-ink truncate">{titleText}</span>
-            {plan && (
-              <span className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-canvas/70 border border-telemetry/30 tabular-nums text-[10px] text-telemetry shrink-0">
-                <Radio className="w-3 h-3" />
-                {modeBadgeLabel}
-              </span>
-            )}
           </div>
 
           <button
