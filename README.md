@@ -97,4 +97,4 @@ LUNE_WEB_DIR="$(pwd)/dist" go run -C ../lune ./cmd/lune
 
 ## License
 
-Licensed under the [GNU Affero General Public License v3.0](LICENSE).
+Licensed under the [GNU Affero General Public License v3.0](LICENSE). Third-party notices and licenses are listed in [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md).
