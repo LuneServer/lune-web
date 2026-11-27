@@ -77,6 +77,25 @@ export interface MaintenanceConfig {
   prune_audit_logs: boolean;
   audit_retention_days: number;
   optimize_database: boolean;
+  generate_chapter_thumbnails: boolean;
+}
+
+export type MaintenanceTask =
+  | 'artwork'
+  | 'transcode_cache'
+  | 'audit'
+  | 'chapter_thumbnails'
+  | 'optimize_db';
+
+export interface MaintenanceProgress {
+  stage: string;
+  label: string;
+  detail?: string;
+  completed: number;
+  total: number;
+  percent: number;
+  step: number;
+  total_steps: number;
 }
 
 export interface MaintenanceRunReport {
@@ -84,19 +103,27 @@ export interface MaintenanceRunReport {
   finished_at: string;
   duration_ms: number;
   trigger: 'scheduled' | 'manual' | string;
+  task?: MaintenanceTask | string;
+  canceled?: boolean;
   skipped_artwork_scan_busy?: boolean;
+  skipped_chapters_busy?: boolean;
   artwork_files_removed: number;
   artwork_bytes_freed: number;
   transcode_items_removed: number;
   transcode_bytes_freed: number;
   audit_events_pruned: number;
   database_optimized: boolean;
+  chapter_thumbnails_generated: number;
+  chapter_thumbnails_existing?: number;
+  chapter_thumbnails_total?: number;
+  chapter_thumbnails_missing_files?: number;
   errors?: string[];
 }
 
 export interface MaintenanceStatus {
   config: MaintenanceConfig;
   running: boolean;
+  progress?: MaintenanceProgress;
   last_run?: MaintenanceRunReport;
   next_run_at?: string;
   server_timezone?: string;
@@ -187,6 +214,7 @@ export interface ChapterInfo {
   start_ms: number;
   end_ms: number;
   kind: 'intro' | 'outro' | 'recap' | 'preview' | 'chapter';
+  thumbnail_url?: string;
 }
 
 export interface MediaItemSummary {
@@ -1118,8 +1146,17 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify(cfg),
     }),
-  adminRunMaintenance: () =>
-    request<MaintenanceStatus>('/api/v1/admin/maintenance/run', {
+  adminRunMaintenance: (task?: MaintenanceTask) =>
+    request<MaintenanceStatus>(
+      task
+        ? `/api/v1/admin/maintenance/run?task=${encodeURIComponent(task)}`
+        : '/api/v1/admin/maintenance/run',
+      {
+        method: 'POST',
+      },
+    ),
+  adminCancelMaintenance: () =>
+    request<MaintenanceStatus>('/api/v1/admin/maintenance/cancel', {
       method: 'POST',
     }),
 };

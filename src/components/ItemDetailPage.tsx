@@ -28,6 +28,7 @@ import {
   formatDuration,
   formatResolution,
   type AudioTrack,
+  type ChapterInfo,
   type DiscoverFilter,
   type MediaItemDetail,
   type MediaItemSummary,
@@ -100,6 +101,92 @@ function formatReleaseDate(raw?: string): string {
     day: 'numeric',
     timeZone: 'UTC',
   });
+}
+
+function formatChapterTimecode(ms: number): string {
+  const totalSec = Math.max(0, Math.floor((ms || 0) / 1000));
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  if (h > 0) {
+    return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+  }
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+
+function formatChapterKindBadge(kind: ChapterInfo['kind']): string | null {
+  switch (kind) {
+    case 'intro':
+      return 'OP';
+    case 'outro':
+      return 'ED';
+    case 'recap':
+      return 'RECAP';
+    case 'preview':
+      return 'PREVIEW';
+    default:
+      return null;
+  }
+}
+
+function ChapterCard({
+  chapter,
+  bustSuffix,
+  onSelect,
+}: {
+  chapter: ChapterInfo;
+  bustSuffix: string;
+  onSelect: () => void;
+}) {
+  const [imgError, setImgError] = useState(false);
+  const src = chapter.thumbnail_url ? `${chapter.thumbnail_url}${bustSuffix}` : '';
+  const showImage = Boolean(src) && !imgError;
+  const timecode = formatChapterTimecode(chapter.start_ms);
+  const kindBadge = formatChapterKindBadge(chapter.kind);
+  const title = chapter.title || `Chapter ${chapter.index + 1}`;
+
+  useEffect(() => {
+    setImgError(false);
+  }, [src]);
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className="group w-[228px] sm:w-[252px] shrink-0 snap-start text-left flex flex-col rounded-xl bg-surface border border-tone/[0.08] hover:border-tone/25 hover:-translate-y-0.5 overflow-hidden transition-all duration-200 cursor-pointer"
+    >
+      <div className="relative aspect-video w-full bg-gradient-to-br from-elevated via-surface to-canvas overflow-hidden">
+        {showImage ? (
+          <>
+            <img
+              src={src}
+              alt={title}
+              loading="lazy"
+              decoding="async"
+              onError={() => setImgError(true)}
+              className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
+            />
+            <span className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded bg-black/75 backdrop-blur-sm text-[10px] font-medium text-white tabular-nums">
+              {timecode}
+            </span>
+          </>
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-1 bg-canvas/70 text-ink-secondary">
+            <Play className="w-4 h-4 fill-current opacity-60 group-hover:opacity-100 transition-opacity" />
+            <span className="text-xs font-medium tabular-nums text-ink">{timecode}</span>
+          </div>
+        )}
+        {kindBadge && (
+          <span className="absolute top-2 left-2 px-1.5 py-0.5 rounded bg-black/75 backdrop-blur-sm border border-white/12 text-[10px] font-semibold tracking-wider text-telemetry">
+            {kindBadge}
+          </span>
+        )}
+      </div>
+      <div className="p-2.5">
+        <div className="text-xs font-medium text-ink truncate">{title}</div>
+      </div>
+    </button>
+  );
 }
 
 export function ItemDetailPage({
@@ -1137,25 +1224,51 @@ export function ItemDetailPage({
 
         {/* Clickable MKV Chapters (Jump straight to timestamp) */}
         {detail?.chapters && detail.chapters.length > 0 && (
-          <section className="space-y-3">
-            <h2 className="text-base font-semibold tracking-[-0.02em] text-ink">
-              Chapters <span className="text-xs font-normal text-ink-muted tabular-nums ml-1">{detail.chapters.length}</span>
-            </h2>
-            <div className="flex flex-wrap gap-2">
+          detail.chapters.some((ch) => Boolean(ch.thumbnail_url)) ? (
+            <MediaShelf
+              itemCount={detail.chapters.length}
+              header={
+                <h2 className="text-base font-semibold tracking-[-0.02em] text-ink">
+                  Chapters{' '}
+                  <span className="text-xs font-normal text-ink-muted tabular-nums ml-1">
+                    {detail.chapters.length}
+                  </span>
+                </h2>
+              }
+            >
               {detail.chapters.map((ch) => (
-                <button
+                <ChapterCard
                   key={ch.index}
-                  type="button"
-                  onClick={() => launchPlayback(ch.start_ms)}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface hover:bg-elevated border border-tone/[0.08] hover:border-tone/25 text-xs tabular-nums transition-colors cursor-pointer"
-                >
-                  <Play className="w-3 h-3 fill-current text-ink-secondary" />
-                  <span className="font-medium text-ink">{ch.title || `Chapter ${ch.index + 1}`}</span>
-                  <span className="text-ink-muted">{formatDuration(ch.start_ms)}</span>
-                </button>
+                  chapter={ch}
+                  bustSuffix={bustSuffix}
+                  onSelect={() => launchPlayback(ch.start_ms)}
+                />
               ))}
-            </div>
-          </section>
+            </MediaShelf>
+          ) : (
+            <section className="space-y-3">
+              <h2 className="text-base font-semibold tracking-[-0.02em] text-ink">
+                Chapters{' '}
+                <span className="text-xs font-normal text-ink-muted tabular-nums ml-1">
+                  {detail.chapters.length}
+                </span>
+              </h2>
+              <div className="flex flex-wrap gap-2">
+                {detail.chapters.map((ch) => (
+                  <button
+                    key={ch.index}
+                    type="button"
+                    onClick={() => launchPlayback(ch.start_ms)}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-surface hover:bg-elevated border border-tone/[0.08] hover:border-tone/25 text-xs tabular-nums transition-colors cursor-pointer"
+                  >
+                    <Play className="w-3 h-3 fill-current text-ink-secondary" />
+                    <span className="font-medium text-ink">{ch.title || `Chapter ${ch.index + 1}`}</span>
+                    <span className="text-ink-muted">{formatDuration(ch.start_ms)}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )
         )}
 
         {/* More from This Season Shelf (Episodes Only) */}

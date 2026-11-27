@@ -19,12 +19,14 @@ import {
   Radio,
   FastForward,
   Languages,
+  List,
   Loader2,
   RefreshCw,
 } from 'lucide-react';
 import {
   api,
   normalizeLangCode,
+  type ChapterInfo,
   type MediaItemDetail,
   type MediaItemSummary,
   type PlaybackLaunchOptions,
@@ -188,8 +190,9 @@ export function TheaterPlayer({
 
   // OSD & popovers
   const [osdVisible, setOsdVisible] = useState(true);
-  const [openMenu, setOpenMenu] = useState<'none' | 'subtitles' | 'settings'>('none');
+  const [openMenu, setOpenMenu] = useState<'none' | 'subtitles' | 'settings' | 'chapters'>('none');
   const [showStats, setShowStats] = useState(false);
+  const [brokenChapterThumbs, setBrokenChapterThumbs] = useState<Record<string, true>>({});
 
   // Up Next auto-advance
   const [upNextCountdown, setUpNextCountdown] = useState<number | null>(null);
@@ -340,6 +343,7 @@ export function TheaterPlayer({
     setSubCues([]);
     setSubOffsetSec(0);
     setOpenMenu('none');
+    setBrokenChapterThumbs({});
     setUpNextCountdown(null);
     setUpNextDismissed(false);
     setCurrentTime(0);
@@ -1232,9 +1236,40 @@ export function TheaterPlayer({
     seekTo,
   ]);
 
+  // Chapters list & active/hovered chapter lookups
+  const chapters = useMemo(
+    () => plan?.chapters ?? detail?.chapters ?? [],
+    [plan?.chapters, detail?.chapters],
+  );
+  const hasAnyChapterThumbs = useMemo(
+    () => chapters.some((ch) => Boolean(ch.thumbnail_url)),
+    [chapters],
+  );
+  const activeChapterIndex = useMemo(() => {
+    if (chapters.length === 0) return null;
+    const ms = currentTime * 1000;
+    const match =
+      chapters.find((ch) => ms >= ch.start_ms && (ch.end_ms > ch.start_ms ? ms < ch.end_ms : true)) ??
+      [...chapters].reverse().find((ch) => ms >= ch.start_ms);
+    return match ? match.index : null;
+  }, [chapters, currentTime]);
+
+  const hoveredChapter = useMemo<ChapterInfo | null>(() => {
+    if (scrubPreviewSec === null || chapters.length === 0) return null;
+    const ms = scrubPreviewSec * 1000;
+    return (
+      chapters.find((ch) => ms >= ch.start_ms && (ch.end_ms > ch.start_ms ? ms < ch.end_ms : true)) ??
+      [...chapters].reverse().find((ch) => ms >= ch.start_ms) ??
+      null
+    );
+  }, [scrubPreviewSec, chapters]);
+
+  const markChapterThumbBroken = useCallback((url: string) => {
+    setBrokenChapterThumbs((prev) => (prev[url] ? prev : { ...prev, [url]: true }));
+  }, []);
+
   // Active skippable chapter (OP / ED / Recap) for 1-click Skip button and 'S' shortcut
   const activeSkipChapter = useMemo(() => {
-    const chapters = plan?.chapters ?? detail?.chapters ?? [];
     if (chapters.length === 0) return null;
     const ms = currentTime * 1000;
     return (
@@ -1245,7 +1280,7 @@ export function TheaterPlayer({
           ms < ch.end_ms - 1200,
       ) ?? null
     );
-  }, [plan, detail, currentTime]);
+  }, [chapters, currentTime]);
 
   const skipActiveChapter = useCallback(() => {
     if (!activeSkipChapter) return;
@@ -1881,15 +1916,43 @@ export function TheaterPlayer({
                 if (!draggingRef.current) setScrubPreviewSec(null);
               }}
             >
-              {/* Hover / Drag Timestamp Tooltip */}
-              {scrubPreviewSec !== null && duration > 0 && (
-                <div
-                  className="absolute -top-8 -translate-x-1/2 px-2 py-0.5 rounded-md bg-canvas/90 border border-white/15 tabular-nums text-[11px] text-ink shadow-lg pointer-events-none whitespace-nowrap"
-                  style={{ left: `${Math.min(97, Math.max(3, scrubPreviewPct))}%` }}
-                >
-                  {formatClock(scrubPreviewSec)}
-                </div>
-              )}
+              {/* Hover / Drag Timestamp & Chapter Still Preview */}
+              {scrubPreviewSec !== null && duration > 0 && (() => {
+                const thumbUrl = hoveredChapter?.thumbnail_url;
+                const showThumb = Boolean(thumbUrl && !brokenChapterThumbs[thumbUrl]);
+                const chTitle = hoveredChapter?.title || (hoveredChapter ? `Chapter ${hoveredChapter.index + 1}` : '');
+                if (showThumb && thumbUrl) {
+                  return (
+                    <div
+                      className="absolute bottom-7 -translate-x-1/2 w-40 sm:w-44 rounded-lg bg-canvas/92 backdrop-blur-xl border border-white/15 overflow-hidden shadow-2xl pointer-events-none"
+                      style={{ left: `${Math.min(88, Math.max(12, scrubPreviewPct))}%` }}
+                    >
+                      <div className="aspect-video w-full bg-surface overflow-hidden">
+                        <img
+                          src={thumbUrl}
+                          alt={chTitle}
+                          onError={() => markChapterThumbBroken(thumbUrl)}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="px-2 py-1.5 flex items-center justify-between gap-2 text-[11px] leading-tight">
+                        <span className="text-ink truncate">{chTitle}</span>
+                        <span className="tabular-nums text-ink-secondary shrink-0">
+                          {formatClock(scrubPreviewSec)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+                  <div
+                    className="absolute -top-8 -translate-x-1/2 px-2 py-0.5 rounded-md bg-canvas/90 border border-white/15 tabular-nums text-[11px] text-ink shadow-lg pointer-events-none whitespace-nowrap"
+                    style={{ left: `${Math.min(97, Math.max(3, scrubPreviewPct))}%` }}
+                  >
+                    {chTitle ? `${chTitle} · ${formatClock(scrubPreviewSec)}` : formatClock(scrubPreviewSec)}
+                  </div>
+                );
+              })()}
 
               <div className="w-full h-1 group-hover:h-1.5 transition-all rounded-full bg-white/20 overflow-hidden">
                 <div
@@ -1903,7 +1966,7 @@ export function TheaterPlayer({
               />
               {/* Subtle MKV chapter ticks (OP / ED / Chapters) */}
               {duration > 0 &&
-                (plan?.chapters ?? detail?.chapters ?? []).map((ch) => {
+                chapters.map((ch) => {
                   const leftPct = Math.min(99, Math.max(0, (ch.start_ms / 1000 / duration) * 100));
                   if (leftPct <= 0.5) return null;
                   const isSpecial = ch.kind === 'intro' || ch.kind === 'outro';
@@ -1995,6 +2058,103 @@ export function TheaterPlayer({
                   <span className="hidden sm:inline">{isCurrentlyJapanese ? 'SUB · JP' : 'DUB · EN'}</span>
                   <span className="sm:hidden">{isCurrentlyJapanese ? 'JP' : 'EN'}</span>
                 </button>
+              )}
+
+              {/* Chapters Menu Trigger */}
+              {chapters.length > 0 && (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setOpenMenu(openMenu === 'chapters' ? 'none' : 'chapters')}
+                    title="Chapters"
+                    className={`p-1.5 sm:p-2 rounded-lg transition-colors cursor-pointer ${
+                      openMenu === 'chapters'
+                        ? 'text-telemetry bg-telemetry/15'
+                        : 'text-ink/85 hover:text-white hover:bg-white/10'
+                    }`}
+                  >
+                    <List className="w-4 h-4" />
+                  </button>
+
+                  {openMenu === 'chapters' && (
+                    <div className="fixed inset-x-3 bottom-24 sm:inset-x-auto sm:absolute sm:bottom-12 sm:right-0 sm:w-80 z-50 rounded-xl bg-canvas/92 backdrop-blur-xl backdrop-saturate-150 border border-white/14 p-3 shadow-2xl space-y-2 max-h-[60vh] sm:max-h-[70vh] overflow-y-auto">
+                      <div className="flex items-center justify-between px-1">
+                        <span className="text-[10px] font-semibold uppercase tracking-widest text-ink-secondary">
+                          Chapters
+                        </span>
+                        <span className="text-[10px] tabular-nums text-ink-muted">
+                          {chapters.length}
+                        </span>
+                      </div>
+                      <div className="space-y-1">
+                        {chapters.map((ch) => {
+                          const isCurrent = activeChapterIndex === ch.index;
+                          const chTitle = ch.title || `Chapter ${ch.index + 1}`;
+                          const thumbUrl = ch.thumbnail_url;
+                          const showThumb = Boolean(thumbUrl && !brokenChapterThumbs[thumbUrl]);
+                          const kindLabel =
+                            ch.kind === 'intro'
+                              ? 'OP'
+                              : ch.kind === 'outro'
+                                ? 'ED'
+                                : ch.kind === 'recap'
+                                  ? 'RECAP'
+                                  : ch.kind === 'preview'
+                                    ? 'PREVIEW'
+                                    : null;
+                          return (
+                            <button
+                              key={ch.index}
+                              type="button"
+                              onClick={() => {
+                                seekTo(ch.start_ms / 1000, true);
+                                setOpenMenu('none');
+                              }}
+                              className={`w-full flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-left transition-colors cursor-pointer ${
+                                isCurrent
+                                  ? 'bg-white/12 text-ink'
+                                  : 'text-ink-secondary hover:bg-surface hover:text-ink'
+                              }`}
+                            >
+                              {hasAnyChapterThumbs && (
+                                <div className="relative w-20 aspect-video rounded-md overflow-hidden bg-surface border border-white/10 shrink-0 flex items-center justify-center">
+                                  {showThumb && thumbUrl ? (
+                                    <img
+                                      src={thumbUrl}
+                                      alt={chTitle}
+                                      loading="lazy"
+                                      decoding="async"
+                                      onError={() => markChapterThumbBroken(thumbUrl)}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <Play className="w-3 h-3 fill-current text-ink-muted opacity-70" />
+                                  )}
+                                </div>
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs font-medium text-ink truncate">
+                                    {chTitle}
+                                  </span>
+                                  {kindLabel && (
+                                    <span className="px-1 py-0.2 rounded bg-telemetry/15 text-[9px] font-semibold text-telemetry shrink-0">
+                                      {kindLabel}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[11px] tabular-nums text-ink-muted">
+                                  {formatClock(ch.start_ms / 1000)}
+                                </div>
+                              </div>
+                              {isCurrent && <Check className="w-3.5 h-3.5 text-telemetry shrink-0" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* Subtitles Menu Trigger */}
