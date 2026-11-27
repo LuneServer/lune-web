@@ -33,6 +33,7 @@ import {
   type PlaybackOptions,
   type PlaybackPlan,
   type SubtitleStream,
+  type TrickplayInfo,
   type UserPreferences,
 } from '../lib/api';
 import { useBodyScrollLock } from '../lib/useBodyScrollLock';
@@ -1292,6 +1293,34 @@ export function TheaterPlayer({
     );
   }, [scrubPreviewSec, chapters]);
 
+  // Trickplay scrubbing previews: pick the sprite-sheet tile for the hovered time.
+  const trickplay = plan?.trickplay;
+  const [brokenTrickplaySheets, setBrokenTrickplaySheets] = useState<Record<string, true>>({});
+  const trickplayPreloadedRef = useRef<string>('');
+  const hoveredTrickplay = useMemo(() => {
+    if (scrubPreviewSec === null || !trickplay || trickplay.thumb_count <= 0) return null;
+    const perSheet = trickplay.columns * trickplay.rows;
+    const idx = trickplayTileIndex(trickplay, scrubPreviewSec * 1000);
+    const url = trickplay.sheet_urls[Math.floor(idx / perSheet)];
+    if (!url || brokenTrickplaySheets[url]) return null;
+    const cell = idx % perSheet;
+    return { url, col: cell % trickplay.columns, row: Math.floor(cell / trickplay.columns) };
+  }, [scrubPreviewSec, trickplay, brokenTrickplaySheets]);
+
+  // Fetch every sheet once on first scrub so later hovers are instant. A film is a handful of
+  // cached JPEGs; a broken sheet falls back to chapter stills / the timestamp bubble.
+  useEffect(() => {
+    if (scrubPreviewSec === null || !trickplay) return;
+    const key = trickplay.sheet_urls.join('|');
+    if (trickplayPreloadedRef.current === key) return;
+    trickplayPreloadedRef.current = key;
+    for (const url of trickplay.sheet_urls) {
+      const img = new Image();
+      img.onerror = () => setBrokenTrickplaySheets((prev) => (prev[url] ? prev : { ...prev, [url]: true }));
+      img.src = url;
+    }
+  }, [scrubPreviewSec, trickplay]);
+
   const markChapterThumbBroken = useCallback((url: string) => {
     setBrokenChapterThumbs((prev) => (prev[url] ? prev : { ...prev, [url]: true }));
   }, []);
@@ -2016,6 +2045,34 @@ export function TheaterPlayer({
                 const thumbUrl = hoveredChapter?.thumbnail_url;
                 const showThumb = Boolean(thumbUrl && !brokenChapterThumbs[thumbUrl]);
                 const chTitle = hoveredChapter?.title || (hoveredChapter ? `Chapter ${hoveredChapter.index + 1}` : '');
+                if (hoveredTrickplay && trickplay) {
+                  // Scale the sheet so one tile fills the preview box exactly.
+                  const boxW = 176;
+                  const scale = boxW / trickplay.thumb_width;
+                  const boxH = Math.round(trickplay.thumb_height * scale);
+                  return (
+                    <div
+                      className="absolute bottom-7 -translate-x-1/2 rounded-lg bg-canvas/92 backdrop-blur-xl border border-white/15 overflow-hidden shadow-2xl pointer-events-none"
+                      style={{ left: `${Math.min(88, Math.max(12, scrubPreviewPct))}%`, width: boxW }}
+                    >
+                      <div
+                        className="w-full bg-surface bg-no-repeat"
+                        style={{
+                          height: boxH,
+                          backgroundImage: `url("${hoveredTrickplay.url}")`,
+                          backgroundSize: `${trickplay.columns * trickplay.thumb_width * scale}px ${trickplay.rows * trickplay.thumb_height * scale}px`,
+                          backgroundPosition: `-${hoveredTrickplay.col * trickplay.thumb_width * scale}px -${hoveredTrickplay.row * trickplay.thumb_height * scale}px`,
+                        }}
+                      />
+                      <div className="px-2 py-1.5 flex items-center justify-between gap-2 text-[11px] leading-tight">
+                        <span className="text-ink truncate">{chTitle}</span>
+                        <span className="tabular-nums text-ink-secondary shrink-0">
+                          {formatClock(scrubPreviewSec)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                }
                 if (showThumb && thumbUrl) {
                   return (
                     <div
@@ -2612,6 +2669,22 @@ function formatClock(totalSec: number): string {
     return `${h}:${String(m).padStart(2, '0')}:${String(rem).padStart(2, '0')}`;
   }
   return `${m}:${String(rem).padStart(2, '0')}`;
+}
+
+/** Index of the trickplay tile covering media time `ms` (last tile starting at or before it). */
+function trickplayTileIndex(tp: TrickplayInfo, ms: number): number {
+  const stamps = tp.timestamps_ms;
+  if (stamps && stamps.length === tp.thumb_count) {
+    let lo = 0;
+    let hi = stamps.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi + 1) >> 1;
+      if (stamps[mid] <= ms) lo = mid;
+      else hi = mid - 1;
+    }
+    return lo;
+  }
+  return Math.min(tp.thumb_count - 1, Math.max(0, Math.floor(ms / tp.interval_ms)));
 }
 
 function resolveActiveCueText(cues: Cue[], absSec: number, offsetSec: number): string {

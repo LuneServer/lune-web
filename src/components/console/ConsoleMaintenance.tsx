@@ -23,6 +23,7 @@ const TASK_LABELS: Record<MaintenanceTask, string> = {
   transcode_cache: 'Transcode & Sub Cache',
   audit: 'Audit Log Pruning',
   chapter_thumbnails: 'Chapter Stills',
+  trickplay: 'Scrubbing Previews',
   optimize_db: 'SQLite Optimization',
 };
 
@@ -38,7 +39,17 @@ const DEFAULT_CONFIG: MaintenanceConfig = {
   audit_retention_days: 90,
   optimize_database: true,
   generate_chapter_thumbnails: true,
+  generate_trickplay: false,
+  trickplay_interval_seconds: 10,
+  trickplay_width: 320,
 };
+
+const TRICKPLAY_INTERVALS = [5, 10, 20, 30];
+const TRICKPLAY_WIDTHS: { px: number; label: string }[] = [
+  { px: 240, label: 'Compact · 240px' },
+  { px: 320, label: 'Standard · 320px' },
+  { px: 480, label: 'Sharp · 480px' },
+];
 
 const INTERVAL_PRESETS: { label: string; hours: number }[] = [
   { label: '12h', hours: 12 },
@@ -451,6 +462,19 @@ export function ConsoleMaintenance() {
                 {lastRun.skipped_artwork_scan_busy && (
                   <span className="text-warning">
                     Artwork sweep skipped (library scan in progress)
+                  </span>
+                )}
+                {lastRun.skipped_trickplay_busy && (
+                  <span className="text-warning">
+                    Scrubbing previews paused too long (playback never stopped); next pass continues
+                  </span>
+                )}
+                {(lastRun.trickplay_total ?? 0) > 0 && (
+                  <span className="text-ink-muted tabular-nums">
+                    Scrubbing previews {lastRun.trickplay_existing ?? 0}/{lastRun.trickplay_total}
+                    {(lastRun.trickplay_generated ?? 0) > 0 ? ` (+${lastRun.trickplay_generated} new)` : ''}
+                    {(lastRun.trickplay_bytes ?? 0) > 0 ? ` · ${formatBytes(lastRun.trickplay_bytes ?? 0)} on disk` : ''}
+                    {(lastRun.trickplay_failed ?? 0) > 0 ? ` · ${lastRun.trickplay_failed} unreadable` : ''}
                   </span>
                 )}
                 {(lastRun.skipped_chapters_busy || status?.chapters_resume_pending) && (
@@ -913,6 +937,84 @@ export function ConsoleMaintenance() {
                   className="inline-flex items-center gap-1 rounded-md bg-canvas hover:bg-elevated border border-hairline disabled:opacity-40 text-ink-secondary hover:text-ink text-[11px] font-medium px-2.5 py-1 transition-colors cursor-pointer"
                 >
                   {runningTask === 'chapter_thumbnails' || status?.progress?.stage === 'chapter_thumbnails' ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Play className="w-2.5 h-2.5 fill-current" />
+                  )}
+                  Run
+                </button>
+              </div>
+            </div>
+
+            {/* Scrubbing Previews (Trickplay) */}
+            <div className="py-4 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+              <div className="space-y-1 max-w-lg">
+                <div className="text-xs font-medium text-ink">Generate Scrubbing Previews</div>
+                <p className="text-[11px] leading-relaxed text-ink-muted">
+                  Builds timeline preview thumbnails shown while scrubbing. Built to stay small
+                  and cheap: decodes keyframes only, single-threaded at background priority, and
+                  paused whenever someone is streaming or a library scan runs. Thumbnails are packed
+                  into AVIF sprite sheets (WebP or JPEG if this server's FFmpeg can't encode AVIF),
+                  and repeated frames such as static shots, black screens and credits are stored
+                  once. Titles are only rebuilt when the file or these settings change.
+                </p>
+                {cfg.generate_trickplay && (
+                  <div className="flex flex-wrap items-center gap-2 pt-1.5">
+                    <label className="flex items-center gap-1.5 text-[11px] text-ink-muted">
+                      Every
+                      <select
+                        value={cfg.trickplay_interval_seconds ?? 10}
+                        onChange={(e) => {
+                          setCfg((prev) => ({ ...prev, trickplay_interval_seconds: Number(e.target.value) }));
+                          clearFeedback();
+                        }}
+                        className="rounded-lg bg-canvas border border-hairline px-2 py-1 text-xs tabular-nums text-ink focus:outline-none focus:border-tone/50"
+                      >
+                        {TRICKPLAY_INTERVALS.map((sec) => (
+                          <option key={sec} value={sec}>
+                            {sec}s
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="flex items-center gap-1.5 text-[11px] text-ink-muted">
+                      Size
+                      <select
+                        value={cfg.trickplay_width ?? 320}
+                        onChange={(e) => {
+                          setCfg((prev) => ({ ...prev, trickplay_width: Number(e.target.value) }));
+                          clearFeedback();
+                        }}
+                        className="rounded-lg bg-canvas border border-hairline px-2 py-1 text-xs text-ink focus:outline-none focus:border-tone/50"
+                      >
+                        {TRICKPLAY_WIDTHS.map((w) => (
+                          <option key={w.px} value={w.px}>
+                            {w.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <span className="text-[10px] text-ink-muted">Changing these rebuilds every title.</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center gap-3 shrink-0">
+                <TogglePill
+                  checked={Boolean(cfg.generate_trickplay)}
+                  onChange={(v) => {
+                    setCfg((prev) => ({ ...prev, generate_trickplay: v }));
+                    clearFeedback();
+                  }}
+                  label="Toggle scrubbing preview generation"
+                />
+                <button
+                  type="button"
+                  disabled={runningNow || status?.running}
+                  onClick={() => void handleRunNow('trickplay')}
+                  className="inline-flex items-center gap-1 rounded-md bg-canvas hover:bg-elevated border border-hairline disabled:opacity-40 text-ink-secondary hover:text-ink text-[11px] font-medium px-2.5 py-1 transition-colors cursor-pointer"
+                >
+                  {runningTask === 'trickplay' || status?.progress?.stage === 'trickplay' ? (
                     <Loader2 className="w-3 h-3 animate-spin" />
                   ) : (
                     <Play className="w-2.5 h-2.5 fill-current" />
