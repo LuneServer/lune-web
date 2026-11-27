@@ -36,6 +36,10 @@ export interface GridViewData {
   series: SeriesSummary[];
   items: MediaItemSummary[];
   favorites?: MediaItemSummary[];
+  /** Server-side `total` for the paginated `/api/v1/items` query behind `items`. */
+  itemsTotal?: number;
+  /** Raw rows fetched so far (before client-side episode filtering); the next page's `offset`. */
+  itemsOffset?: number;
 }
 
 const DEFAULT_FRESH_MS = 30_000;

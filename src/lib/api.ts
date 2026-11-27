@@ -856,6 +856,7 @@ export const api = {
       studio?: string;
       sort?: SortOption;
       limit?: number;
+      offset?: number;
     },
     signal?: AbortSignal,
   ) => {
@@ -876,8 +877,9 @@ export const api = {
     if (params?.watched) qs.set('watched', params.watched);
     if (params?.sort) qs.set('sort', params.sort);
     if (params?.limit) qs.set('limit', String(params.limit));
+    if (params?.offset) qs.set('offset', String(params.offset));
     const qStr = qs.toString();
-    return request<{ items: MediaItemSummary[]; total: number }>(
+    return request<{ items: MediaItemSummary[]; total: number; limit?: number; offset?: number }>(
       `/api/v1/items${qStr ? `?${qStr}` : ''}`,
       signal ? { signal } : undefined,
     );
