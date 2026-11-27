@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -7,6 +7,7 @@ import {
   Loader2,
   Play,
   Save,
+  Square,
 } from 'lucide-react';
 import {
   api,
@@ -14,7 +15,16 @@ import {
   formatBytes,
   type MaintenanceConfig,
   type MaintenanceStatus,
+  type MaintenanceTask,
 } from '../../lib/api';
+
+const TASK_LABELS: Record<MaintenanceTask, string> = {
+  artwork: 'Orphaned Artwork',
+  transcode_cache: 'Transcode & Sub Cache',
+  audit: 'Audit Log Pruning',
+  chapter_thumbnails: 'Chapter Stills',
+  optimize_db: 'SQLite Optimization',
+};
 
 const DEFAULT_CONFIG: MaintenanceConfig = {
   enabled: true,
@@ -27,6 +37,7 @@ const DEFAULT_CONFIG: MaintenanceConfig = {
   prune_audit_logs: true,
   audit_retention_days: 90,
   optimize_database: true,
+  generate_chapter_thumbnails: true,
 };
 
 const INTERVAL_PRESETS: { label: string; hours: number }[] = [
@@ -80,6 +91,7 @@ function TogglePill({
 }
 
 export function ConsoleMaintenance() {
+  const statusCardRef = useRef<HTMLDivElement>(null);
   const [status, setStatus] = useState<MaintenanceStatus | null>(null);
   const [cfg, setCfg] = useState<MaintenanceConfig>(DEFAULT_CONFIG);
 
@@ -95,12 +107,14 @@ export function ConsoleMaintenance() {
   const [loadErr, setLoadErr] = useState('');
   const [saving, setSaving] = useState(false);
   const [runningNow, setRunningNow] = useState(false);
+  const [runningTask, setRunningTask] = useState<MaintenanceTask | 'all' | null>(null);
+  const [canceling, setCanceling] = useState(false);
   const [err, setErr] = useState('');
   const [feedback, setFeedback] = useState('');
 
   function hydrate(next: MaintenanceStatus) {
     setStatus(next);
-    const c = next.config ?? DEFAULT_CONFIG;
+    const c: MaintenanceConfig = { ...DEFAULT_CONFIG, ...(next.config ?? {}) };
     setCfg(c);
     setIntervalInput(String(c.interval_hours));
     if (c.schedule_time && c.schedule_time.trim() !== '') {
@@ -155,23 +169,24 @@ export function ConsoleMaintenance() {
     };
   }, []);
 
-  // Poll status while a background maintenance pass is running without overwriting unsaved draft edits.
+  // Poll live status & progress while a manual or scheduled pass is running without overwriting unsaved draft edits.
   useEffect(() => {
-    if (!status?.running) return;
+    if (!status?.running && !runningNow) return;
     let active = true;
-    const timer = window.setInterval(() => {
+    const poll = () => {
       api
         .adminGetMaintenance()
         .then((res) => {
           if (active) setStatus(res);
         })
         .catch(() => {});
-    }, 2000);
+    };
+    const timer = window.setInterval(poll, 1000);
     return () => {
       active = false;
       window.clearInterval(timer);
     };
-  }, [status?.running]);
+  }, [status?.running, runningNow]);
 
   function clearFeedback() {
     if (feedback) setFeedback('');
@@ -246,19 +261,39 @@ export function ConsoleMaintenance() {
     }
   }
 
-  async function handleRunNow() {
+  async function handleRunNow(task?: MaintenanceTask) {
     setErr('');
     setFeedback('');
     setRunningNow(true);
+    setRunningTask(task ?? 'all');
+    setCanceling(false);
+    requestAnimationFrame(() => {
+      statusCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
     try {
-      const updated = await api.adminRunMaintenance();
+      const updated = await api.adminRunMaintenance(task);
       // Preserve any unsaved form draft edits; only refresh live status and last-run report.
       setStatus(updated);
-      setFeedback('Housekeeping pass completed.');
+      const label = task ? TASK_LABELS[task] : 'Housekeeping pass';
+      setFeedback(updated.last_run?.canceled ? `${label} canceled.` : `${label} completed.`);
     } catch (error) {
       setErr(error instanceof ApiError ? error.message : 'Failed to run maintenance');
     } finally {
       setRunningNow(false);
+      setRunningTask(null);
+      setCanceling(false);
+    }
+  }
+
+  async function handleCancelRun() {
+    setErr('');
+    setCanceling(true);
+    try {
+      const updated = await api.adminCancelMaintenance();
+      setStatus(updated);
+    } catch (error) {
+      setErr(error instanceof ApiError ? error.message : 'Failed to cancel maintenance');
+      setCanceling(false);
     }
   }
 
@@ -295,7 +330,10 @@ export function ConsoleMaintenance() {
   return (
     <div className="space-y-6">
       {/* Status & Manual Run Card */}
-      <div className="rounded-xl bg-surface border border-tone/[0.08] p-5 space-y-4">
+      <div
+        ref={statusCardRef}
+        className="scroll-mt-20 rounded-xl bg-surface border border-tone/[0.08] p-5 space-y-4"
+      >
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h2 className="text-sm font-semibold text-ink">Housekeeping Status</h2>
@@ -308,7 +346,7 @@ export function ConsoleMaintenance() {
           <button
             type="button"
             disabled={runningNow || status?.running}
-            onClick={handleRunNow}
+            onClick={() => void handleRunNow()}
             className="inline-flex items-center gap-1.5 rounded-lg bg-accent hover:bg-accent-hover disabled:opacity-50 text-on-accent text-xs font-semibold px-3.5 py-2 transition-colors cursor-pointer shrink-0"
           >
             {runningNow || status?.running ? (
@@ -356,19 +394,73 @@ export function ConsoleMaintenance() {
           </div>
         </div>
 
+        {(status?.running || runningNow) && (
+          <div className="rounded-lg bg-canvas/70 border border-tone/[0.1] p-3.5 space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-telemetry shrink-0" />
+                <span className="font-medium text-ink truncate">
+                  {status?.progress?.label ?? 'Running housekeeping pass…'}
+                </span>
+                {status?.progress && status.progress.total_steps > 0 && (
+                  <span className="text-[11px] text-ink-muted tabular-nums shrink-0">
+                    Step {status.progress.step} of {status.progress.total_steps}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2.5 shrink-0">
+                <span className="text-xs font-semibold text-ink tabular-nums">
+                  {status?.progress ? `${status.progress.percent}%` : '…'}
+                </span>
+                <button
+                  type="button"
+                  disabled={canceling}
+                  onClick={handleCancelRun}
+                  className="inline-flex items-center gap-1 rounded-md bg-danger/15 hover:bg-danger/25 border border-danger/30 disabled:opacity-50 text-danger text-[11px] font-semibold px-2.5 py-1 transition-colors cursor-pointer"
+                >
+                  <Square className="w-2.5 h-2.5 fill-current" />
+                  {canceling ? 'Canceling…' : 'Cancel'}
+                </button>
+              </div>
+            </div>
+            <div className="h-1.5 w-full rounded-full bg-tone/[0.08] overflow-hidden">
+              <div
+                className="h-full rounded-full bg-accent transition-[width] duration-300 ease-out"
+                style={{ width: `${Math.max(4, status?.progress?.percent ?? 5)}%` }}
+              />
+            </div>
+            {status?.progress?.detail && (
+              <div className="text-[11px] text-ink-muted truncate tabular-nums">
+                {status.progress.detail}
+              </div>
+            )}
+          </div>
+        )}
+
         {lastRun && (
           <div className="rounded-lg bg-canvas/50 border border-tone/[0.06] p-3.5 space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-ink-secondary">
               <span className="font-medium text-ink">
-                Last Pass Summary ({lastRun.trigger === 'manual' ? 'Manual' : 'Scheduled'})
+                Last Pass Summary ({lastRun.trigger === 'manual' ? 'Manual' : 'Scheduled'}
+                {lastRun.task && lastRun.task in TASK_LABELS
+                  ? ` · ${TASK_LABELS[lastRun.task as MaintenanceTask]}`
+                  : ''}
+                {lastRun.canceled ? ' · Canceled' : ''})
               </span>
-              {lastRun.skipped_artwork_scan_busy && (
-                <span className="text-warning">
-                  Artwork sweep skipped (library scan in progress)
-                </span>
-              )}
+              <div className="flex flex-wrap items-center gap-3">
+                {lastRun.skipped_artwork_scan_busy && (
+                  <span className="text-warning">
+                    Artwork sweep skipped (library scan in progress)
+                  </span>
+                )}
+                {lastRun.skipped_chapters_busy && (
+                  <span className="text-warning">
+                    Chapter stills paused (scan or stream active)
+                  </span>
+                )}
+              </div>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs tabular-nums">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs tabular-nums">
               <div>
                 <span className="text-ink-muted block text-[10px]">Orphaned Artwork</span>
                 <span className="text-ink font-medium">
@@ -379,7 +471,7 @@ export function ConsoleMaintenance() {
                 </span>
               </div>
               <div>
-                <span className="text-ink-muted block text-[10px]">Transcode & Sub Cache</span>
+                <span className="text-ink-muted block text-[10px]">Transcode &amp; Sub Cache</span>
                 <span className="text-ink font-medium">
                   {lastRun.transcode_items_removed} items
                   {lastRun.transcode_bytes_freed > 0
@@ -390,6 +482,46 @@ export function ConsoleMaintenance() {
               <div>
                 <span className="text-ink-muted block text-[10px]">Audit Events Pruned</span>
                 <span className="text-ink font-medium">{lastRun.audit_events_pruned}</span>
+              </div>
+              <div>
+                <span className="text-ink-muted block text-[10px]">Chapter Stills</span>
+                <span className="text-ink font-medium">
+                  {(() => {
+                    const gen = lastRun.chapter_thumbnails_generated ?? 0;
+                    const existing = lastRun.chapter_thumbnails_existing ?? 0;
+                    const total = lastRun.chapter_thumbnails_total ?? 0;
+                    const missing = lastRun.chapter_thumbnails_missing_files ?? 0;
+                    if (!status?.config.generate_chapter_thumbnails && gen === 0 && total === 0) {
+                      return 'Disabled';
+                    }
+                    if (total > 0) {
+                      const pct = Math.round((existing / total) * 100);
+                      return `${existing}/${total} (${pct}%)`;
+                    }
+                    return `${gen} ${gen === 1 ? 'still' : 'stills'}`;
+                  })()}
+                </span>
+                {((lastRun.chapter_thumbnails_generated ?? 0) > 0 ||
+                  (lastRun.chapter_thumbnails_missing_files ?? 0) > 0) && (
+                  <span
+                    className={`block text-[10px] ${
+                      (lastRun.chapter_thumbnails_missing_files ?? 0) > 0
+                        ? 'text-warning'
+                        : 'text-ink-muted'
+                    }`}
+                  >
+                    {(lastRun.chapter_thumbnails_generated ?? 0) > 0
+                      ? `+${lastRun.chapter_thumbnails_generated} new`
+                      : ''}
+                    {(lastRun.chapter_thumbnails_generated ?? 0) > 0 &&
+                    (lastRun.chapter_thumbnails_missing_files ?? 0) > 0
+                      ? ' · '
+                      : ''}
+                    {(lastRun.chapter_thumbnails_missing_files ?? 0) > 0
+                      ? `${lastRun.chapter_thumbnails_missing_files} offline`
+                      : ''}
+                  </span>
+                )}
               </div>
               <div>
                 <span className="text-ink-muted block text-[10px]">SQLite Optimize</span>
@@ -609,6 +741,19 @@ export function ConsoleMaintenance() {
                   }}
                   label="Toggle orphaned artwork cleanup"
                 />
+                <button
+                  type="button"
+                  disabled={runningNow || status?.running}
+                  onClick={() => void handleRunNow('artwork')}
+                  className="inline-flex items-center gap-1 rounded-md bg-canvas hover:bg-elevated border border-hairline disabled:opacity-40 text-ink-secondary hover:text-ink text-[11px] font-medium px-2.5 py-1 transition-colors cursor-pointer"
+                >
+                  {runningTask === 'artwork' || status?.progress?.stage === 'artwork' ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Play className="w-2.5 h-2.5 fill-current" />
+                  )}
+                  Run
+                </button>
               </div>
             </div>
 
@@ -656,6 +801,19 @@ export function ConsoleMaintenance() {
                   }}
                   label="Toggle transcode and subtitle cache cleanup"
                 />
+                <button
+                  type="button"
+                  disabled={runningNow || status?.running}
+                  onClick={() => void handleRunNow('transcode_cache')}
+                  className="inline-flex items-center gap-1 rounded-md bg-canvas hover:bg-elevated border border-hairline disabled:opacity-40 text-ink-secondary hover:text-ink text-[11px] font-medium px-2.5 py-1 transition-colors cursor-pointer"
+                >
+                  {runningTask === 'transcode_cache' || status?.progress?.stage === 'transcode_cache' ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Play className="w-2.5 h-2.5 fill-current" />
+                  )}
+                  Run
+                </button>
               </div>
             </div>
 
@@ -703,6 +861,54 @@ export function ConsoleMaintenance() {
                   }}
                   label="Toggle audit log retention"
                 />
+                <button
+                  type="button"
+                  disabled={runningNow || status?.running}
+                  onClick={() => void handleRunNow('audit')}
+                  className="inline-flex items-center gap-1 rounded-md bg-canvas hover:bg-elevated border border-hairline disabled:opacity-40 text-ink-secondary hover:text-ink text-[11px] font-medium px-2.5 py-1 transition-colors cursor-pointer"
+                >
+                  {runningTask === 'audit' || status?.progress?.stage === 'audit' ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Play className="w-2.5 h-2.5 fill-current" />
+                  )}
+                  Run
+                </button>
+              </div>
+            </div>
+
+            {/* Generate Chapter Stills */}
+            <div className="py-4 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+              <div className="space-y-1 max-w-lg">
+                <div className="text-xs font-medium text-ink">Generate Chapter Stills</div>
+                <p className="text-[11px] leading-relaxed text-ink-muted">
+                  Extracts 480p JPEG stills at chapter keyframes during off-peak maintenance.
+                  Automatically pauses during active streams or library scans.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3 shrink-0">
+                <TogglePill
+                  checked={cfg.generate_chapter_thumbnails}
+                  onChange={(v) => {
+                    setCfg((prev) => ({ ...prev, generate_chapter_thumbnails: v }));
+                    clearFeedback();
+                  }}
+                  label="Toggle chapter stills generation"
+                />
+                <button
+                  type="button"
+                  disabled={runningNow || status?.running}
+                  onClick={() => void handleRunNow('chapter_thumbnails')}
+                  className="inline-flex items-center gap-1 rounded-md bg-canvas hover:bg-elevated border border-hairline disabled:opacity-40 text-ink-secondary hover:text-ink text-[11px] font-medium px-2.5 py-1 transition-colors cursor-pointer"
+                >
+                  {runningTask === 'chapter_thumbnails' || status?.progress?.stage === 'chapter_thumbnails' ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Play className="w-2.5 h-2.5 fill-current" />
+                  )}
+                  Run
+                </button>
               </div>
             </div>
 
@@ -716,7 +922,7 @@ export function ConsoleMaintenance() {
                 </p>
               </div>
 
-              <div className="flex items-center shrink-0">
+              <div className="flex items-center gap-3 shrink-0">
                 <TogglePill
                   checked={cfg.optimize_database}
                   onChange={(v) => {
@@ -725,6 +931,19 @@ export function ConsoleMaintenance() {
                   }}
                   label="Toggle SQLite optimization"
                 />
+                <button
+                  type="button"
+                  disabled={runningNow || status?.running}
+                  onClick={() => void handleRunNow('optimize_db')}
+                  className="inline-flex items-center gap-1 rounded-md bg-canvas hover:bg-elevated border border-hairline disabled:opacity-40 text-ink-secondary hover:text-ink text-[11px] font-medium px-2.5 py-1 transition-colors cursor-pointer"
+                >
+                  {runningTask === 'optimize_db' || status?.progress?.stage === 'optimize_db' ? (
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Play className="w-2.5 h-2.5 fill-current" />
+                  )}
+                  Run
+                </button>
               </div>
             </div>
           </div>
