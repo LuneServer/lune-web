@@ -177,6 +177,7 @@ export function TheaterPlayer({
   // Modifiable subtitle settings
   const [selectedSubIdx, setSelectedSubIdx] = useState<number | null>(null);
   const [subCues, setSubCues] = useState<Cue[]>([]);
+  const [activeCueText, setActiveCueText] = useState('');
   const [subStatus, setSubStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [subRetryNonce, setSubRetryNonce] = useState(0);
   const [subSize, setSubSize] = useState<'sm' | 'md' | 'lg'>(readStoredSubSize);
@@ -411,6 +412,7 @@ export function TheaterPlayer({
     let networkRetryTimer: number | null = null;
     let directStartupTimer: number | null = null;
     let silentAudioChecked = false;
+    let pendingResumeSeek = false;
 
     const isStaleSession = () =>
       disposed || renegotiatingRef.current || activeSessionIdRef.current !== plan.session_id;
@@ -569,13 +571,37 @@ export function TheaterPlayer({
         plan.resume_position_ms > 2000 &&
         (!video.duration || plan.resume_position_ms / 1000 < video.duration - 2)
       ) {
-        video.currentTime = plan.resume_position_ms / 1000;
+        const resumeSec = plan.resume_position_ms / 1000;
+        currentTimeRef.current = resumeSec;
+        setCurrentTime(resumeSec);
+        if (Math.abs(video.currentTime - resumeSec) > 0.05) {
+          // Wait for `seeked` before calling `play()` so the browser audio/video clock settles on the resumed timestamp.
+          pendingResumeSeek = true;
+          video.currentTime = resumeSec;
+          return;
+        }
       }
       if (shouldAutoPlayRef.current) {
         video.play().catch(() => {});
       } else {
         setBuffering(false);
         setPlaying(false);
+      }
+    };
+
+    const onSeeked = () => {
+      if (isStaleSession()) return;
+      const abs = getAbsoluteTime();
+      currentTimeRef.current = abs;
+      setCurrentTime(abs);
+      if (pendingResumeSeek) {
+        pendingResumeSeek = false;
+        if (shouldAutoPlayRef.current) {
+          video.play().catch(() => {});
+        } else {
+          setBuffering(false);
+          setPlaying(false);
+        }
       }
     };
 
@@ -644,7 +670,7 @@ export function TheaterPlayer({
         window.clearTimeout(directStartupTimer);
         directStartupTimer = null;
       }
-      if (shouldAutoPlayRef.current && video.paused && !isStaleSession()) {
+      if (shouldAutoPlayRef.current && video.paused && !pendingResumeSeek && !isStaleSession()) {
         video.play().catch(() => {});
       }
       setBuffering(false);
@@ -700,6 +726,7 @@ export function TheaterPlayer({
     };
 
     video.addEventListener('loadedmetadata', onLoaded);
+    video.addEventListener('seeked', onSeeked);
     video.addEventListener('timeupdate', onTime);
     video.addEventListener('play', onPlay);
     video.addEventListener('playing', onPlaying);
@@ -744,6 +771,7 @@ export function TheaterPlayer({
       if (networkRetryTimer !== null) window.clearTimeout(networkRetryTimer);
       if (directStartupTimer !== null) window.clearTimeout(directStartupTimer);
       video.removeEventListener('loadedmetadata', onLoaded);
+      video.removeEventListener('seeked', onSeeked);
       video.removeEventListener('timeupdate', onTime);
       video.removeEventListener('play', onPlay);
       video.removeEventListener('playing', onPlaying);
@@ -1546,15 +1574,82 @@ export function TheaterPlayer({
     seekTo(ratio * duration, true);
   };
 
-  // Active subtitle cues adjusted by user sync offset (uses true absolute currentTime!)
-  const activeCueText = useMemo(() => {
-    if (selectedSubIdx === null || subCues.length === 0) return '';
-    const t = currentTime - subOffsetSec;
-    return subCues
-      .filter((c) => t >= c.start && t <= c.end)
-      .map((c) => c.text)
-      .join('\n');
-  }, [selectedSubIdx, subCues, currentTime, subOffsetSec]);
+  // Frame-accurate subtitle cue tracking while playing via requestVideoFrameCallback
+  // (using presented frame mediaTime) with requestAnimationFrame fallback, avoiding ~250ms
+  // HTML5 `timeupdate` jitter and only triggering React renders when the cue text changes.
+  useEffect(() => {
+    if (selectedSubIdx === null || subCues.length === 0) {
+      setActiveCueText('');
+      return;
+    }
+
+    const syncCueAt = (absSec: number) => {
+      const next = resolveActiveCueText(subCues, absSec, subOffsetSec);
+      setActiveCueText((prev) => (prev === next ? prev : next));
+    };
+
+    const video = videoRef.current;
+    if (!playing || !video) {
+      return;
+    }
+
+    const getLiveAbsTime = (frameMediaTime?: number) => {
+      if (draggingRef.current) return currentTimeRef.current;
+      const localSec =
+        typeof frameMediaTime === 'number' && Number.isFinite(frameMediaTime)
+          ? frameMediaTime
+          : Number.isFinite(video.currentTime)
+            ? video.currentTime
+            : 0;
+      return streamOffsetSec + localSec;
+    };
+
+    syncCueAt(getLiveAbsTime());
+
+    type VideoFrameCallback = (now: DOMHighResTimeStamp, metadata: { mediaTime: number }) => void;
+    const vWithRVFC = video as HTMLVideoElement & {
+      requestVideoFrameCallback?: (cb: VideoFrameCallback) => number;
+      cancelVideoFrameCallback?: (id: number) => void;
+    };
+
+    let cancelled = false;
+    if (typeof vWithRVFC.requestVideoFrameCallback === 'function') {
+      let handle = 0;
+      const onFrame: VideoFrameCallback = (_now, metadata) => {
+        if (cancelled) return;
+        syncCueAt(getLiveAbsTime(metadata?.mediaTime));
+        handle = vWithRVFC.requestVideoFrameCallback!(onFrame);
+      };
+      handle = vWithRVFC.requestVideoFrameCallback(onFrame);
+      return () => {
+        cancelled = true;
+        vWithRVFC.cancelVideoFrameCallback?.(handle);
+      };
+    }
+
+    let rafId = 0;
+    const tick = () => {
+      if (cancelled) return;
+      syncCueAt(getLiveAbsTime());
+      rafId = window.requestAnimationFrame(tick);
+    };
+    rafId = window.requestAnimationFrame(tick);
+    return () => {
+      cancelled = true;
+      window.cancelAnimationFrame(rafId);
+    };
+  }, [playing, selectedSubIdx, subCues, subOffsetSec, streamOffsetSec]);
+
+  // Keep subtitles immediately in sync when paused, scrubbing, or adjusting timing offset.
+  useEffect(() => {
+    if (selectedSubIdx === null || subCues.length === 0) {
+      setActiveCueText('');
+      return;
+    }
+    if (playing && !draggingRef.current) return;
+    const next = resolveActiveCueText(subCues, currentTime, subOffsetSec);
+    setActiveCueText((prev) => (prev === next ? prev : next));
+  }, [playing, selectedSubIdx, subCues, currentTime, subOffsetSec]);
 
   const remainingSec = Math.max(0, duration - currentTime);
   const endsAtLabel = useMemo(() => {
@@ -2517,6 +2612,18 @@ function formatClock(totalSec: number): string {
     return `${h}:${String(m).padStart(2, '0')}:${String(rem).padStart(2, '0')}`;
   }
   return `${m}:${String(rem).padStart(2, '0')}`;
+}
+
+function resolveActiveCueText(cues: Cue[], absSec: number, offsetSec: number): string {
+  const t = absSec - offsetSec;
+  let out = '';
+  for (let i = 0; i < cues.length; i++) {
+    const c = cues[i];
+    if (t >= c.start && t <= c.end) {
+      out = out ? `${out}\n${c.text}` : c.text;
+    }
+  }
+  return out;
 }
 
 function parseWebVTT(vtt: string): Cue[] {
