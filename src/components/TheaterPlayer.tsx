@@ -51,7 +51,25 @@ interface Cue {
   start: number;
   end: number;
   text: string;
+  /** WebVTT `line:` percentage (from ASS signs / \an7-9 top cues); undefined = default bottom box. */
+  line?: number;
+  /** WebVTT `position:` percentage; defaults to centred when only `line` is set. */
+  position?: number;
 }
+
+interface PlacedCue {
+  text: string;
+  line: number;
+  position: number;
+}
+
+interface ActiveSubtitles {
+  key: string;
+  text: string;
+  placed: PlacedCue[];
+}
+
+const NO_ACTIVE_SUBS: ActiveSubtitles = { key: '', text: '', placed: [] };
 
 type QualityPreset = {
   id: string;
@@ -177,7 +195,8 @@ export function TheaterPlayer({
   // Modifiable subtitle settings
   const [selectedSubIdx, setSelectedSubIdx] = useState<number | null>(null);
   const [subCues, setSubCues] = useState<Cue[]>([]);
-  const [activeCueText, setActiveCueText] = useState('');
+  const [activeSubs, setActiveSubs] = useState<ActiveSubtitles>(NO_ACTIVE_SUBS);
+  const activeCueText = activeSubs.text;
   const [subStatus, setSubStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [subRetryNonce, setSubRetryNonce] = useState(0);
   const [subSize, setSubSize] = useState<'sm' | 'md' | 'lg'>(readStoredSubSize);
@@ -1607,13 +1626,13 @@ export function TheaterPlayer({
   // HTML5 `timeupdate` jitter and only triggering React renders when the cue text changes.
   useEffect(() => {
     if (selectedSubIdx === null || subCues.length === 0) {
-      setActiveCueText('');
+      setActiveSubs(NO_ACTIVE_SUBS);
       return;
     }
 
     const syncCueAt = (absSec: number) => {
-      const next = resolveActiveCueText(subCues, absSec, subOffsetSec);
-      setActiveCueText((prev) => (prev === next ? prev : next));
+      const next = resolveActiveSubtitles(subCues, absSec, subOffsetSec);
+      setActiveSubs((prev) => (prev.key === next.key ? prev : next));
     };
 
     const video = videoRef.current;
@@ -1671,12 +1690,12 @@ export function TheaterPlayer({
   // Keep subtitles immediately in sync when paused, scrubbing, or adjusting timing offset.
   useEffect(() => {
     if (selectedSubIdx === null || subCues.length === 0) {
-      setActiveCueText('');
+      setActiveSubs(NO_ACTIVE_SUBS);
       return;
     }
     if (playing && !draggingRef.current) return;
-    const next = resolveActiveCueText(subCues, currentTime, subOffsetSec);
-    setActiveCueText((prev) => (prev === next ? prev : next));
+    const next = resolveActiveSubtitles(subCues, currentTime, subOffsetSec);
+    setActiveSubs((prev) => (prev.key === next.key ? prev : next));
   }, [playing, selectedSubIdx, subCues, currentTime, subOffsetSec]);
 
   const remainingSec = Math.max(0, duration - currentTime);
@@ -1700,6 +1719,27 @@ export function TheaterPlayer({
 
   const subSizeClass =
     subSize === 'sm' ? 'text-base sm:text-lg' : subSize === 'lg' ? 'text-2xl sm:text-3xl' : 'text-lg sm:text-2xl';
+
+  // Rendered picture rectangle inside the stage, used to place positioned (sign) cues on the frame.
+  const videoRect = useMemo(() => {
+    const vidW = decodedResolution?.width || detail?.video_width || initialItem?.video_width || 0;
+    const vidH = decodedResolution?.height || detail?.video_height || initialItem?.video_height || 0;
+    const sw = stageSize.width;
+    const sh = stageSize.height;
+    if (sw <= 0 || sh <= 0 || vidW <= 0 || vidH <= 0) return { left: 0, top: 0, width: sw, height: sh };
+    const width = Math.min(sw, sh * (vidW / vidH));
+    const height = Math.min(sh, sw / (vidW / vidH));
+    return { left: (sw - width) / 2, top: (sh - height) / 2, width, height };
+  }, [
+    decodedResolution?.width,
+    decodedResolution?.height,
+    detail?.video_width,
+    detail?.video_height,
+    initialItem?.video_width,
+    initialItem?.video_height,
+    stageSize.width,
+    stageSize.height,
+  ]);
 
   // Keep subtitles cleanly inside the rendered video frame instead of dipping into bottom letterbox bars.
   const subtitleBottomPx = useMemo(() => {
@@ -1798,6 +1838,30 @@ export function TheaterPlayer({
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Positioned cues (ASS signs, top-aligned lines). Each box is translated by its own
+            position percentage, so it always stays inside the picture even when anchored at an edge. */}
+        {activeSubs.placed.length > 0 && videoRect.width > 0 && (
+          <div
+            className="absolute pointer-events-none"
+            style={{ left: videoRect.left, top: videoRect.top, width: videoRect.width, height: videoRect.height }}
+          >
+            {activeSubs.placed.map((c, i) => (
+              <div
+                key={`${i}:${c.line}:${c.position}`}
+                className={`absolute ${subSizeClass} font-medium text-ink text-center whitespace-pre-line px-4 py-1.5 rounded-lg bg-canvas/75 backdrop-blur-xs shadow-lg w-max max-w-[min(48rem,90%)] leading-snug`}
+                style={{
+                  left: `${c.position}%`,
+                  top: `${c.line}%`,
+                  transform: `translate(-${c.position}%, -${c.line}%)`,
+                  textShadow: '0 2px 6px rgba(0,0,0,0.9)',
+                }}
+              >
+                {renderFormattedSubtitle(c.text)}
+              </div>
+            ))}
           </div>
         )}
 
@@ -2680,16 +2744,31 @@ function trickplayTileIndex(tp: TrickplayInfo, ms: number): number {
   return Math.min(tp.thumb_count - 1, Math.max(0, Math.floor(ms / tp.interval_ms)));
 }
 
-function resolveActiveCueText(cues: Cue[], absSec: number, offsetSec: number): string {
+function resolveActiveSubtitles(cues: Cue[], absSec: number, offsetSec: number): ActiveSubtitles {
   const t = absSec - offsetSec;
-  let out = '';
+  let text = '';
+  const placed: PlacedCue[] = [];
   for (let i = 0; i < cues.length; i++) {
     const c = cues[i];
     if (t >= c.start && t <= c.end) {
-      out = out ? `${out}\n${c.text}` : c.text;
+      if (c.line === undefined && c.position === undefined) {
+        text = text ? `${text}\n${c.text}` : c.text;
+      } else {
+        placed.push({ text: c.text, line: c.line ?? 90, position: c.position ?? 50 });
+      }
     }
   }
-  return out;
+  if (!text && placed.length === 0) return NO_ACTIVE_SUBS;
+  const key = `${text}\u0000${placed.map((p) => `${p.line},${p.position},${p.text}`).join('\u0000')}`;
+  return { key, text, placed };
+}
+
+/** Reads a WebVTT `line:`/`position:` percentage cue setting, clamped to the frame. */
+function parseCueSettingPct(settings: string, name: 'line' | 'position'): number | undefined {
+  const m = settings.match(new RegExp(`(?:^|\\s)${name}:(-?[\\d.]+)%`));
+  if (!m) return undefined;
+  const v = Number(m[1]);
+  return Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : undefined;
 }
 
 function parseWebVTT(vtt: string): Cue[] {
@@ -2702,9 +2781,14 @@ function parseWebVTT(vtt: string): Cue[] {
       .filter(Boolean);
     const timeIdx = lines.findIndex((l) => l.includes('-->'));
     if (timeIdx === -1) continue;
-    const [startRaw, endRaw] = lines[timeIdx].split('-->').map((s) => s.trim().split(/\s+/)[0]);
+    const [startPart, endPart = ''] = lines[timeIdx].split('-->').map((s) => s.trim());
+    const startRaw = startPart.split(/\s+/)[0];
+    const [endRaw, ...settingParts] = endPart.split(/\s+/);
+    const settings = settingParts.join(' ');
     const start = parseVTTTime(startRaw);
     const end = parseVTTTime(endRaw);
+    const line = parseCueSettingPct(settings, 'line');
+    const position = parseCueSettingPct(settings, 'position');
     const text = decodeVTTEscaped(
       lines
         .slice(timeIdx + 1)
@@ -2712,7 +2796,7 @@ function parseWebVTT(vtt: string): Cue[] {
         .replace(/<(?!\/?(?:i|b|u)\b)[^>]+>/gi, ''),
     );
     if (text && Number.isFinite(start) && Number.isFinite(end)) {
-      cues.push({ start, end, text });
+      cues.push(line === undefined && position === undefined ? { start, end, text } : { start, end, text, line, position });
     }
   }
   return cues;
