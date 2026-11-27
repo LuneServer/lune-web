@@ -40,6 +40,9 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
   const [subsEnabled, setSubsEnabled] = useState(initialPrefs?.subtitles_enabled ?? false);
   const [autoplayNext, setAutoplayNext] = useState(initialPrefs?.autoplay_next ?? true);
   const [combineNextUp, setCombineNextUp] = useState(initialPrefs?.combine_next_up ?? true);
+  const [showChapterMarkers, setShowChapterMarkers] = useState(
+    initialPrefs?.show_chapter_markers ?? true,
+  );
   const [posterBadges, setPosterBadges] = useState<PosterBadge[]>(initialPrefs?.poster_badges ?? []);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -81,6 +84,7 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
         setSubsEnabled(Boolean(profile.preferences.subtitles_enabled));
         setAutoplayNext(profile.preferences.autoplay_next ?? true);
         setCombineNextUp(profile.preferences.combine_next_up ?? true);
+        setShowChapterMarkers(profile.preferences.show_chapter_markers ?? true);
         setPosterBadges(profile.preferences.poster_badges ?? []);
         setTotpEnabled(Boolean(profile.totp_enabled));
         setTotpRequired(Boolean(profile.totp_required));
@@ -151,6 +155,7 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
         autoplay_next: autoplayNext,
         max_bitrate: initialPrefs?.max_bitrate,
         combine_next_up: combineNextUp,
+        show_chapter_markers: showChapterMarkers,
         poster_badges: posterBadges,
       };
       const updated = await api.updateUserProfile({
@@ -355,6 +360,35 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
                 <span
                   className={`inline-block h-3.5 w-3.5 rounded-full transition-transform ${
                     combineNextUp
+                      ? 'translate-x-[18px] bg-on-accent'
+                      : 'translate-x-0.5 bg-ink-secondary'
+                  }`}
+                />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 pt-1 border-t border-tone/[0.06]">
+              <div>
+                <div className="text-xs font-medium text-ink">Show chapter markers</div>
+                <div className="text-[11px] text-ink-muted">
+                  Draw chapter tick marks on the player&apos;s progress bar. Skip Intro still works when off.
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={showChapterMarkers}
+                aria-label="Show chapter markers"
+                onClick={() => setShowChapterMarkers((v) => !v)}
+                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors cursor-pointer ${
+                  showChapterMarkers
+                    ? 'bg-accent border-accent'
+                    : 'bg-elevated border-hairline'
+                }`}
+              >
+                <span
+                  className={`inline-block h-3.5 w-3.5 rounded-full transition-transform ${
+                    showChapterMarkers
                       ? 'translate-x-[18px] bg-on-accent'
                       : 'translate-x-0.5 bg-ink-secondary'
                   }`}

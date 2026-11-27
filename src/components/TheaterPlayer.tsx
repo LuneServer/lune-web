@@ -2173,8 +2173,9 @@ export function TheaterPlayer({
                 className="absolute left-0 h-1 group-hover:h-1.5 transition-all rounded-full bg-white"
                 style={{ width: `${progressPct}%` }}
               />
-              {/* Subtle MKV chapter ticks (OP / ED / Chapters) */}
+              {/* Subtle MKV chapter ticks (OP / ED / Chapters); hidden by the show_chapter_markers pref */}
               {duration > 0 &&
+                (userPreferences?.show_chapter_markers ?? true) &&
                 chapters.map((ch) => {
                   const leftPct = Math.min(99, Math.max(0, (ch.start_ms / 1000 / duration) * 100));
                   if (leftPct <= 0.5) return null;

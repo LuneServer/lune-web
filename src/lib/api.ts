@@ -164,6 +164,8 @@ export interface UserPreferences {
   autoplay_next: boolean;
   max_bitrate?: number;
   combine_next_up?: boolean;
+  /** Draw chapter tick marks on the player scrub bar (default true). */
+  show_chapter_markers?: boolean;
   poster_badges?: PosterBadge[];
 }
 
