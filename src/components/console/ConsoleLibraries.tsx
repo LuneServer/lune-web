@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { FolderPlus, RefreshCw, Trash2 } from 'lucide-react';
-import { api, ApiError, type Library } from '../../lib/api';
+import { api, ApiError, scanPercent, type Library } from '../../lib/api';
 
 interface Props {
   libraries: Library[];
@@ -179,7 +179,10 @@ export function ConsoleLibraries({ libraries, onLibrariesChanged, onRefreshTelem
         {libraries.length === 0 ? (
           <p className="text-xs text-ink-muted py-4">No libraries configured yet.</p>
         ) : (
-          libraries.map((lib) => (
+          libraries.map((lib) => {
+            const scanning = !!lib.scan?.running;
+            const pct = scanPercent(lib.scan);
+            return (
             <div key={lib.id} className="py-3.5 flex flex-wrap items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -190,7 +193,7 @@ export function ConsoleLibraries({ libraries, onLibrariesChanged, onRefreshTelem
                   <span className="text-xs tabular-nums text-ink-secondary">{lib.item_count} items</span>
                   {lib.scan?.running && (
                     <span className="px-2 py-0.5 rounded-full bg-telemetry/15 text-[10px] font-medium tabular-nums text-telemetry">
-                      scanning
+                      {pct === null ? 'scanning' : `scanning ${pct}%`}
                     </span>
                   )}
                   {lib.scan && lib.scan.errors > 0 && (
@@ -219,21 +222,21 @@ export function ConsoleLibraries({ libraries, onLibrariesChanged, onRefreshTelem
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  disabled={busyID === lib.id || lib.scan?.running}
+                  disabled={busyID === lib.id || scanning}
                   onClick={() => handleScan(lib.id, false)}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-elevated hover:bg-hairline text-xs font-medium text-ink px-3 py-1.5 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-elevated hover:bg-hairline text-xs font-medium text-ink px-3 py-1.5 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   <RefreshCw
-                    className={`w-3.5 h-3.5 ${busyID === lib.id || lib.scan?.running ? 'animate-spin' : ''}`}
+                    className={`w-3.5 h-3.5 ${busyID === lib.id || scanning ? 'animate-spin' : ''}`}
                   />
-                  Scan
+                  {scanning ? (pct === null ? 'Scanning…' : `Scanning… ${pct}%`) : 'Scan'}
                 </button>
                 <button
                   type="button"
                   title="Re-probe and refresh metadata for all items in this library"
-                  disabled={busyID === lib.id || lib.scan?.running}
+                  disabled={busyID === lib.id || scanning}
                   onClick={() => handleScan(lib.id, true)}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-canvas border border-hairline hover:border-accent/60 text-xs font-medium text-ink px-3 py-1.5 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-canvas border border-hairline hover:border-accent/60 text-xs font-medium text-ink px-3 py-1.5 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
                 >
                   Refresh Metadata
                 </button>
@@ -246,6 +249,24 @@ export function ConsoleLibraries({ libraries, onLibrariesChanged, onRefreshTelem
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
+
+              {scanning && (
+                <div
+                  className="basis-full h-1 rounded-full bg-elevated overflow-hidden"
+                  role="progressbar"
+                  aria-label={`Scanning ${lib.name}`}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={pct ?? undefined}
+                >
+                  <div
+                    className={`h-full rounded-full bg-telemetry ${
+                      pct === null ? 'w-1/3 animate-pulse' : 'transition-[width] duration-500'
+                    }`}
+                    style={pct === null ? undefined : { width: `${pct}%` }}
+                  />
+                </div>
+              )}
 
               {lib.scan && lib.scan.errors > 0 && expandedErrors.has(lib.id) && (
                 <div className="basis-full rounded-lg bg-canvas border border-warning/25 p-3 space-y-2">
@@ -276,7 +297,8 @@ export function ConsoleLibraries({ libraries, onLibrariesChanged, onRefreshTelem
                 </div>
               )}
             </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>
