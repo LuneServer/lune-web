@@ -23,13 +23,16 @@ import {
   api,
   ApiError,
   type PosterBadge,
+  type SubtitleStyle,
   type TOTPSetupResponse,
   type AutoSkipMode,
   type UserPreferences,
 } from '../lib/api';
 import { POSTER_BADGE_OPTIONS } from '../lib/posterBadges';
+import { resolveSubtitleStyle } from '../lib/subtitleStyle';
 import { useBodyScrollLock } from '../lib/useBodyScrollLock';
 import { AUTO_SKIP_DEFAULTS, SKIP_COUNTDOWN_SECONDS, normalizeAutoSkip } from '../lib/skipSegments';
+import { SubtitleStyleControls } from './SubtitleStyleControls';
 import { ThemeSwitcher } from './ThemeSwitcher';
 
 interface Props {
@@ -64,7 +67,7 @@ const SECTIONS: { id: SectionId; label: string; description: string; icon: Lucid
   {
     id: 'languages',
     label: 'Audio & Subtitles',
-    description: 'Default audio and subtitle tracks, and anime Sub/Dub behaviour.',
+    description: 'Default tracks, anime Sub/Dub behaviour, and how subtitles look.',
     icon: Languages,
   },
   {
@@ -235,6 +238,8 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
   const [autoSkipCredits, setAutoSkipCredits] = useState<AutoSkipMode>(
     normalizeAutoSkip(initialPrefs?.auto_skip_credits, AUTO_SKIP_DEFAULTS.credits),
   );
+  const [subStyle, setSubStyle] = useState<SubtitleStyle>(() => resolveSubtitleStyle(initialPrefs?.subtitle_style));
+  const subStyleTouchedRef = useRef(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -296,6 +301,7 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
         setAutoSkipIntro(normalizeAutoSkip(profile.preferences.auto_skip_intro, AUTO_SKIP_DEFAULTS.intro));
         setAutoSkipRecap(normalizeAutoSkip(profile.preferences.auto_skip_recap, AUTO_SKIP_DEFAULTS.recap));
         setAutoSkipCredits(normalizeAutoSkip(profile.preferences.auto_skip_credits, AUTO_SKIP_DEFAULTS.credits));
+        if (!subStyleTouchedRef.current) setSubStyle(resolveSubtitleStyle(profile.preferences.subtitle_style));
         setTotpEnabled(Boolean(profile.totp_enabled));
         setTotpRequired(Boolean(profile.totp_required));
       })
@@ -370,6 +376,7 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
         auto_skip_intro: autoSkipIntro,
         auto_skip_recap: autoSkipRecap,
         auto_skip_credits: autoSkipCredits,
+        subtitle_style: subStyle,
       };
       const updated = await api.updateUserProfile({
         display_name: name.trim() || displayName,
@@ -590,6 +597,22 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
                     checked={subsEnabled}
                     onChange={setSubsEnabled}
                   />
+                </SettingsGroup>
+
+                <SettingsGroup
+                  title="Subtitle appearance"
+                  footer="Synced to your account, so every Lune app uses the same style."
+                >
+                  <div className="p-4">
+                    <SubtitleStyleControls
+                      value={subStyle}
+                      onChange={(next) => {
+                        subStyleTouchedRef.current = true;
+                        setSubStyle(next);
+                      }}
+                      showPreview
+                    />
+                  </div>
                 </SettingsGroup>
               </>
             )}
