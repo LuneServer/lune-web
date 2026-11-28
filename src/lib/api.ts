@@ -63,6 +63,8 @@ export interface StreamingConfig {
   max_global_transcodes: number; // 0 = unlimited
   max_user_transcodes: number;   // 0 = unlimited
   idle_timeout_minutes: number;  // 1..120
+  /** Look up intro/recap/credits timestamps on introdb.app (default true). */
+  introdb_enabled?: boolean;
   transcoder?: TranscoderStatus;
 }
 
@@ -179,6 +181,22 @@ export interface UserPreferences {
   /** Draw chapter tick marks on the player scrub bar (default true). */
   show_chapter_markers?: boolean;
   poster_badges?: PosterBadge[];
+  /** Auto-skip modes for PlaybackPlan.segments (defaults: intro/recap 'countdown', credits 'off'). */
+  auto_skip_intro?: AutoSkipMode;
+  auto_skip_recap?: AutoSkipMode;
+  /** Episodes only: outro (credits) and preview segments. */
+  auto_skip_credits?: AutoSkipMode;
+}
+
+/** 'off' shows the Skip button only, 'countdown' skips after 5 s (cancellable), 'instant' skips at once. */
+export type AutoSkipMode = 'off' | 'countdown' | 'instant';
+
+/** A skippable span in PlaybackPlan.segments (chapter markers first, then IntroDB). */
+export interface SkipSegment {
+  kind: 'intro' | 'recap' | 'outro' | 'preview';
+  start_ms: number;
+  end_ms: number;
+  source: 'chapter' | 'introdb';
 }
 
 export interface User {
@@ -462,6 +480,8 @@ export interface PlaybackPlan {
   selected_subtitle_index?: number;
   burn_subtitle_stream_index?: number;
   chapters?: ChapterInfo[];
+  /** Skippable spans; older servers omit it (fall back to skippable chapters). */
+  segments?: SkipSegment[];
   /** Scrubbing preview sprite sheets, present once maintenance has generated them. */
   trickplay?: TrickplayInfo;
   transcode_enabled: boolean;
