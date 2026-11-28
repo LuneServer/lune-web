@@ -217,6 +217,8 @@ export interface ScanStatus {
   library_id: string;
   running: boolean;
   scanned: number;
+  /** Candidate files found for this scan; 0/undefined until the directory walk finishes. */
+  total?: number;
   added: number;
   updated: number;
   removed: number;
@@ -226,6 +228,12 @@ export interface ScanStatus {
   error_samples?: { path?: string; message: string }[];
   started_at?: string;
   finished_at?: string;
+}
+
+/** Whole-number scan progress (0-100), or null while the total is unknown. */
+export function scanPercent(scan?: ScanStatus | null): number | null {
+  if (!scan?.running || !scan.total || scan.total <= 0) return null;
+  return Math.min(100, Math.max(0, Math.floor((scan.scanned / scan.total) * 100)));
 }
 
 export interface Library {

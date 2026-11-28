@@ -24,6 +24,7 @@ import {
   type HealthStatus,
   type Invite,
   type Library,
+  scanPercent,
 } from '../../lib/api';
 import type { ConsoleSection } from '../AdminConsole';
 import { getEventMeta, type ConsoleAlert } from './auditUtils';
@@ -134,7 +135,12 @@ export function ConsoleOverview({
             </div>
             <div className="text-xs tabular-nums text-ink-secondary mt-1.5 flex flex-wrap items-center gap-x-2.5 gap-y-0.5">
               {scanningLibs.length > 0 ? (
-                <span className="text-telemetry">Scanning {scanningLibs[0].name}…</span>
+                <span className="text-telemetry">
+                  Scanning {scanningLibs[0].name}
+                  {scanPercent(scanningLibs[0].scan) !== null
+                    ? ` ${scanPercent(scanningLibs[0].scan)}%`
+                    : '…'}
+                </span>
               ) : (
                 <>
                   {byKind.movies !== undefined && (
