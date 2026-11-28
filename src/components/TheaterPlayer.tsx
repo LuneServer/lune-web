@@ -43,6 +43,17 @@ import {
   type UserPreferences,
 } from '../lib/api';
 import { useBodyScrollLock } from '../lib/useBodyScrollLock';
+import {
+  NO_SKIP,
+  SkipSegmentTracker,
+  countdownLabel,
+  policyFromPreferences,
+  sameSkipState,
+  segmentId,
+  segmentsFromChapters,
+  skipLabel,
+  type SkipState,
+} from '../lib/skipSegments';
 
 interface Props {
   itemId: string;
@@ -1372,24 +1383,63 @@ export function TheaterPlayer({
     setBrokenChapterThumbs((prev) => (prev[url] ? prev : { ...prev, [url]: true }));
   }, []);
 
-  // Active skippable chapter (OP / ED / Recap) for 1-click Skip button and 'S' shortcut
-  const activeSkipChapter = useMemo(() => {
-    if (chapters.length === 0) return null;
-    const ms = currentTime * 1000;
-    return (
-      chapters.find(
-        (ch) =>
-          (ch.kind === 'intro' || ch.kind === 'outro' || ch.kind === 'recap') &&
-          ms >= ch.start_ms &&
-          ms < ch.end_ms - 1200,
-      ) ?? null
-    );
-  }, [chapters, currentTime]);
+  // Skip segments (chapter markers + IntroDB) for the Skip button, auto-skip and the 'S' shortcut.
+  const skipSegments = useMemo(
+    () => (plan?.segments && plan.segments.length > 0 ? plan.segments : segmentsFromChapters(chapters)),
+    [plan?.segments, chapters],
+  );
+  const skipTrackerKey = `${itemId}|${skipSegments.map(segmentId).join(',')}`;
+  const skipTrackerRef = useRef<{ key: string; tracker: SkipSegmentTracker } | null>(null);
+  if (skipTrackerRef.current?.key !== skipTrackerKey) {
+    skipTrackerRef.current = { key: skipTrackerKey, tracker: new SkipSegmentTracker(skipSegments) };
+  }
+  const [skipState, setSkipState] = useState<SkipState>(NO_SKIP);
+  const skipPolicy = useMemo(
+    () =>
+      policyFromPreferences(
+        userPreferences,
+        activeItem?.kind === 'episode' || nextItem !== null,
+        nextItem !== null && userPreferences?.autoplay_next !== false && !upNextDismissed,
+      ),
+    [userPreferences, activeItem?.kind, nextItem, upNextDismissed],
+  );
 
-  const skipActiveChapter = useCallback(() => {
-    if (!activeSkipChapter) return;
-    seekTo(activeSkipChapter.end_ms / 1000);
-  }, [activeSkipChapter, seekTo]);
+  const evaluateSkip = useCallback((): SkipState => {
+    const next = skipTrackerRef.current!.tracker.update(currentTime * 1000, duration * 1000, skipPolicy);
+    setSkipState((prev) => (sameSkipState(prev, next) ? prev : next));
+    return next;
+  }, [currentTime, duration, skipPolicy]);
+
+  // Skips the segment: seeks past it, or for credits that run to the end, plays the next episode.
+  const performSkip = useCallback(
+    (state: SkipState) => {
+      const seg = state.segment;
+      if (!seg) return;
+      skipTrackerRef.current?.tracker.markHandled(seg);
+      evaluateSkip();
+      if (state.endsPlayback && nextItem && !upNextDismissed) {
+        onSelectItem(nextItem);
+        return;
+      }
+      const maxSec = durationRef.current;
+      seekTo(maxSec > 1 ? Math.min(seg.end_ms / 1000, maxSec - 0.5) : seg.end_ms / 1000);
+    },
+    [evaluateSkip, nextItem, upNextDismissed, onSelectItem, seekTo],
+  );
+
+  const cancelAutoSkip = useCallback(() => {
+    if (!skipState.segment) return;
+    skipTrackerRef.current?.tracker.markHandled(skipState.segment);
+    evaluateSkip();
+  }, [skipState.segment, evaluateSkip]);
+
+  useEffect(() => {
+    const state = evaluateSkip();
+    if (state.skipNow) performSkip(state);
+  }, [evaluateSkip, performSkip]);
+
+  const skipActiveChapter = useCallback(() => performSkip(skipState), [performSkip, skipState]);
+  const activeSkipChapter = skipState.segment;
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -1453,7 +1503,9 @@ export function TheaterPlayer({
           }
           break;
         case 'Escape':
-          if (openMenu !== 'none') {
+          if (skipState.countdown !== null) {
+            cancelAutoSkip();
+          } else if (openMenu !== 'none') {
             setOpenMenu('none');
           } else if (!getFullscreenElement()) {
             onClose();
@@ -1483,6 +1535,8 @@ export function TheaterPlayer({
     plan,
     activeSkipChapter,
     skipActiveChapter,
+    skipState.countdown,
+    cancelAutoSkip,
   ]);
 
   function handleQualityChange(preset: QualityPreset) {
@@ -2014,24 +2068,31 @@ export function TheaterPlayer({
           </div>
         )}
 
-        {/* Skip Intro / Opening / Ending / Recap Floating Pill */}
+        {/* Skip Intro / Recap / Credits Floating Pill (with auto-skip countdown) */}
         {activeSkipChapter && upNextCountdown === null && (
           <div
             onClick={(e) => e.stopPropagation()}
-            className={`absolute right-3 sm:right-6 transition-all duration-200 ${osdVisible ? 'bottom-28' : 'bottom-10'}`}
+            className={`absolute right-3 sm:right-6 flex items-center gap-2 transition-all duration-200 ${osdVisible ? 'bottom-28' : 'bottom-10'}`}
           >
+            {skipState.countdown !== null && (
+              <button
+                type="button"
+                onClick={cancelAutoSkip}
+                className="inline-flex items-center rounded-xl bg-canvas/60 hover:bg-canvas/85 text-ink-secondary hover:text-ink border border-white/20 backdrop-blur-xl backdrop-saturate-150 px-3 py-2 sm:py-2.5 text-xs font-medium shadow-2xl transition-all cursor-pointer"
+              >
+                Watch
+              </button>
+            )}
             <button
               type="button"
               onClick={skipActiveChapter}
               className="inline-flex items-center gap-2 rounded-xl bg-canvas/75 hover:bg-accent text-ink hover:text-on-accent border border-white/25 hover:border-accent backdrop-blur-xl backdrop-saturate-150 px-3.5 sm:px-4 py-2 sm:py-2.5 text-xs font-semibold shadow-2xl transition-all cursor-pointer"
             >
               <FastForward className="w-3.5 h-3.5" />
-              <span>
-                {activeSkipChapter.kind === 'intro'
-                  ? 'Skip Opening'
-                  : activeSkipChapter.kind === 'outro'
-                    ? 'Skip Ending'
-                    : 'Skip Recap'}
+              <span className="tabular-nums">
+                {skipState.countdown !== null
+                  ? countdownLabel(activeSkipChapter, skipState.countdown)
+                  : skipLabel(activeSkipChapter)}
               </span>
               <span className="hidden sm:inline tabular-nums text-[10px] opacity-65 ml-0.5">S</span>
             </button>
@@ -2051,6 +2112,7 @@ export function TheaterPlayer({
                 onClick={() => {
                   setUpNextDismissed(true);
                   setUpNextCountdown(null);
+                  cancelAutoSkip();
                 }}
                 className="text-ink-secondary hover:text-ink cursor-pointer"
               >

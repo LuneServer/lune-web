@@ -24,6 +24,7 @@ const DEFAULT_CONFIG: StreamingConfig = {
   max_global_transcodes: 0,
   max_user_transcodes: 3,
   idle_timeout_minutes: 10,
+  introdb_enabled: true,
 };
 
 function normalizeStreamingConfig(raw?: Partial<StreamingConfig> | null): StreamingConfig {
@@ -44,6 +45,7 @@ function normalizeStreamingConfig(raw?: Partial<StreamingConfig> | null): Stream
     max_global_transcodes: maxGlobal,
     max_user_transcodes: maxUser,
     idle_timeout_minutes: idleMinutes,
+    introdb_enabled: raw?.introdb_enabled ?? DEFAULT_CONFIG.introdb_enabled,
   };
 }
 
@@ -55,6 +57,7 @@ export function ConsolePlayback() {
   const [userLimitInput, setUserLimitInput] = useState('3');
 
   const [idleTimeoutInput, setIdleTimeoutInput] = useState('10');
+  const [introDBEnabled, setIntroDBEnabled] = useState(true);
   const [transcoder, setTranscoder] = useState<TranscoderStatus | null>(null);
 
   const [loading, setLoading] = useState(true);
@@ -78,6 +81,7 @@ export function ConsolePlayback() {
     }
 
     setIdleTimeoutInput(String(cfg.idle_timeout_minutes));
+    setIntroDBEnabled(cfg.introdb_enabled ?? true);
   }
 
   useEffect(() => {
@@ -147,6 +151,7 @@ export function ConsolePlayback() {
         max_global_transcodes: maxGlobal,
         max_user_transcodes: maxUser,
         idle_timeout_minutes: idleMinutes,
+        introdb_enabled: introDBEnabled,
       };
       const savedRes = await api.adminSaveStreamingConfig(payload);
       const saved = normalizeStreamingConfig(savedRes);
@@ -459,6 +464,37 @@ export function ConsolePlayback() {
               />
               <span className="text-xs text-ink-muted tabular-nums">min</span>
             </div>
+          </div>
+
+          {/* IntroDB skip segments */}
+          <div className="py-4 last:pb-1 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+            <div className="space-y-1 max-w-lg">
+              <div className="text-xs font-medium text-ink">Skip Intro &amp; Credits from IntroDB</div>
+              <p className="text-[11px] leading-relaxed text-ink-muted">
+                Looks up intro, recap and credits timestamps on introdb.app for titles whose files have no
+                chapter markers. Only the title&apos;s IMDb ID and season/episode numbers are sent; results are
+                cached. Chapter markers in the file always work.
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={introDBEnabled}
+              aria-label="Skip Intro and Credits from IntroDB"
+              onClick={() => {
+                setIntroDBEnabled((v) => !v);
+                clearFeedback();
+              }}
+              className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors cursor-pointer ${
+                introDBEnabled ? 'bg-accent border-accent' : 'bg-elevated border-hairline'
+              }`}
+            >
+              <span
+                className={`inline-block h-3.5 w-3.5 rounded-full transition-transform ${
+                  introDBEnabled ? 'translate-x-[18px] bg-on-accent' : 'translate-x-0.5 bg-ink-secondary'
+                }`}
+              />
+            </button>
           </div>
         </div>
 

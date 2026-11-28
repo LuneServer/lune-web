@@ -6,10 +6,12 @@ import {
   ApiError,
   type PosterBadge,
   type TOTPSetupResponse,
+  type AutoSkipMode,
   type UserPreferences,
 } from '../lib/api';
 import { POSTER_BADGE_OPTIONS } from '../lib/posterBadges';
 import { useBodyScrollLock } from '../lib/useBodyScrollLock';
+import { AUTO_SKIP_DEFAULTS, SKIP_COUNTDOWN_SECONDS, normalizeAutoSkip } from '../lib/skipSegments';
 import { ThemeSwitcher } from './ThemeSwitcher';
 
 interface Props {
@@ -44,6 +46,15 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
     initialPrefs?.show_chapter_markers ?? true,
   );
   const [posterBadges, setPosterBadges] = useState<PosterBadge[]>(initialPrefs?.poster_badges ?? []);
+  const [autoSkipIntro, setAutoSkipIntro] = useState<AutoSkipMode>(
+    normalizeAutoSkip(initialPrefs?.auto_skip_intro, AUTO_SKIP_DEFAULTS.intro),
+  );
+  const [autoSkipRecap, setAutoSkipRecap] = useState<AutoSkipMode>(
+    normalizeAutoSkip(initialPrefs?.auto_skip_recap, AUTO_SKIP_DEFAULTS.recap),
+  );
+  const [autoSkipCredits, setAutoSkipCredits] = useState<AutoSkipMode>(
+    normalizeAutoSkip(initialPrefs?.auto_skip_credits, AUTO_SKIP_DEFAULTS.credits),
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -86,6 +97,9 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
         setCombineNextUp(profile.preferences.combine_next_up ?? true);
         setShowChapterMarkers(profile.preferences.show_chapter_markers ?? true);
         setPosterBadges(profile.preferences.poster_badges ?? []);
+        setAutoSkipIntro(normalizeAutoSkip(profile.preferences.auto_skip_intro, AUTO_SKIP_DEFAULTS.intro));
+        setAutoSkipRecap(normalizeAutoSkip(profile.preferences.auto_skip_recap, AUTO_SKIP_DEFAULTS.recap));
+        setAutoSkipCredits(normalizeAutoSkip(profile.preferences.auto_skip_credits, AUTO_SKIP_DEFAULTS.credits));
         setTotpEnabled(Boolean(profile.totp_enabled));
         setTotpRequired(Boolean(profile.totp_required));
       })
@@ -157,6 +171,9 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
         combine_next_up: combineNextUp,
         show_chapter_markers: showChapterMarkers,
         poster_badges: posterBadges,
+        auto_skip_intro: autoSkipIntro,
+        auto_skip_recap: autoSkipRecap,
+        auto_skip_credits: autoSkipCredits,
       };
       const updated = await api.updateUserProfile({
         display_name: name.trim() || displayName,
@@ -394,6 +411,37 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
                   }`}
                 />
               </button>
+            </div>
+
+            <div className="pt-2.5 border-t border-tone/[0.06] space-y-2">
+              <div>
+                <div className="text-xs font-medium text-ink">Skip intros &amp; credits</div>
+                <div className="text-[11px] text-ink-muted">
+                  From the file&apos;s chapters or IntroDB&apos;s community timestamps. Credits apply to episodes only;
+                  movie credits are never skipped automatically. Synced to all your devices.
+                </div>
+              </div>
+              {(
+                [
+                  ['Intro', autoSkipIntro, setAutoSkipIntro],
+                  ['Recap', autoSkipRecap, setAutoSkipRecap],
+                  ['Credits', autoSkipCredits, setAutoSkipCredits],
+                ] as const
+              ).map(([label, value, setValue]) => (
+                <label key={label} className="flex items-center justify-between gap-3">
+                  <span className="text-xs text-ink-secondary">{label}</span>
+                  <select
+                    value={value}
+                    onChange={(e) => setValue(e.target.value as AutoSkipMode)}
+                    aria-label={`Auto-skip ${label.toLowerCase()}`}
+                    className="w-44 rounded-lg bg-canvas border border-hairline px-3 py-1.5 text-base sm:text-xs text-ink focus:outline-none focus:border-tone/50"
+                  >
+                    <option value="off">Show Skip button</option>
+                    <option value="countdown">Skip after {SKIP_COUNTDOWN_SECONDS} seconds</option>
+                    <option value="instant">Skip instantly</option>
+                  </select>
+                </label>
+              ))}
             </div>
 
             <div className="pt-2.5 border-t border-tone/[0.06] space-y-2">
