@@ -200,14 +200,14 @@ export interface UserPreferences {
   /** Omitted until first saved; omitting it on update keeps the stored value. */
   subtitle_style?: SubtitleStyle;
   /**
-   * Anime-library items only: 'subbed' (Japanese audio + full subtitles) or 'dubbed' (main-language
-   * audio + Signs & Songs). Replaces audio_language / subtitles_enabled for anime. Omitted = automatic;
-   * send 'auto' to clear; omitting it on update keeps the stored value.
+   * Anime-library items only: 'subbed' (default; Japanese audio + full subtitles) or 'dubbed'
+   * (main-language audio + Signs & Songs). Replaces audio_language / subtitles_enabled for anime.
+   * Always returned by current servers; omitting it on update keeps the stored value.
    */
   anime_audio?: AnimeAudioMode;
 }
 
-export type AnimeAudioMode = 'auto' | 'subbed' | 'dubbed';
+export type AnimeAudioMode = 'subbed' | 'dubbed';
 
 /** 'off' shows the Skip button only, 'countdown' skips after 5 s (cancellable), 'instant' skips at once. */
 export type AutoSkipMode = 'off' | 'countdown' | 'instant';
