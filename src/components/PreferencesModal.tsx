@@ -398,12 +398,12 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
     <select
       value={value}
       onChange={(e) => setValue(e.target.value as AutoSkipMode)}
-      aria-label={`Auto-skip ${label.toLowerCase()}`}
+      aria-label={label}
       className={`${selectClass} sm:w-56`}
     >
-      <option value="off">Show Skip button</option>
-      <option value="countdown">Skip after {SKIP_COUNTDOWN_SECONDS} seconds</option>
-      <option value="instant">Skip instantly</option>
+      <option value="off">Off</option>
+      <option value="countdown">After {SKIP_COUNTDOWN_SECONDS} seconds</option>
+      <option value="instant">Instantly</option>
     </select>
   );
 
@@ -505,17 +505,18 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
                   title="Skip intros & credits"
                   footer={
                     <>
-                      Segments come from the file&apos;s chapters or IntroDB&apos;s community timestamps. Movie
-                      credits are never skipped automatically. Synced to all your devices.
+                      Skip automatically, or Off to just show the Skip button. Timestamps come from the file&apos;s
+                      chapters or IntroDB&apos;s community data. Movie credits are never skipped automatically. Synced
+                      to all your devices.
                     </>
                   }
                 >
-                  <SettingRow title="Intro" control={skipSelect('Intro', autoSkipIntro, setAutoSkipIntro)} />
-                  <SettingRow title="Recap" control={skipSelect('Recap', autoSkipRecap, setAutoSkipRecap)} />
+                  <SettingRow title="Skip intro" control={skipSelect('Skip intro', autoSkipIntro, setAutoSkipIntro)} />
+                  <SettingRow title="Skip recap" control={skipSelect('Skip recap', autoSkipRecap, setAutoSkipRecap)} />
                   <SettingRow
-                    title="Credits"
+                    title="Skip credits"
                     description="Episodes only."
-                    control={skipSelect('Credits', autoSkipCredits, setAutoSkipCredits)}
+                    control={skipSelect('Skip credits', autoSkipCredits, setAutoSkipCredits)}
                   />
                 </SettingsGroup>
               </>
