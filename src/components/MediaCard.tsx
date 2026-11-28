@@ -2,6 +2,7 @@ import { Play, Star, X } from 'lucide-react';
 import {
   formatDuration,
   formatResolution,
+  formatTimeLeft,
   type MediaItemSummary,
   type PlaybackProgress,
   type PosterBadge,
@@ -36,7 +37,7 @@ export function MediaCard({
       : 0;
   const timeLabel =
     remainingMS > 0
-      ? `${formatDuration(remainingMS)} left`
+      ? formatTimeLeft(remainingMS)
       : item.duration_ms > 0
         ? formatDuration(item.duration_ms)
         : '';

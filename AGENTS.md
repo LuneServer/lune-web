@@ -65,7 +65,7 @@ lune-web/
         ├── ThemeSwitcher.tsx         # 3-way Appearance selector (Auto/System, Light, Dark) used in header, AuthScreen, and PreferencesModal
         ├── AuthScreen.tsx            # First-run admin setup (/api/v1/setup), login (/api/v1/auth/login) with TOTP 2FA / recovery code step, and invite acceptance (/invite/:token)
         ├── TotpEnrollmentScreen.tsx  # Forced 2FA QR enrollment & recovery code screen when an admin enforces totp_required on a user or invite
-        ├── MediaCard.tsx             # 2:3 poster card with configurable poster badges (default: none; resolution/HDR/Dual Audio/rating) & continue-watching progress bar; with `progress` it shows the time left ("42m 10s left") instead of the runtime
+        ├── MediaCard.tsx             # 2:3 poster card with configurable poster badges (default: none; resolution/HDR/Dual Audio/rating) & continue-watching progress bar; with `progress` it shows the time left ("42m left", `formatTimeLeft`, also on the item page's Resume button) instead of the runtime
         ├── SeriesCard.tsx            # 2:3 TV/Anime series card with configurable poster badges (default: none; seasons/resolution/HDR/Dual Audio/rating)
         ├── MediaListRow.tsx          # Horizontal list-view rows (MediaListRow & SeriesListRow) for Poster/List view switching
         ├── LibraryFilterBar.tsx      # Facet-driven library filter bar (genre, content rating, year, min rating, watched status, 4K/HDR/Dual Audio)
