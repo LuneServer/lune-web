@@ -1,5 +1,23 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
-import { Languages, Sparkles, Subtitles, X, Check, ShieldCheck, Copy, Tags } from 'lucide-react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
+} from 'react';
+import {
+  Check,
+  Copy,
+  Languages,
+  Palette,
+  PlayCircle,
+  ShieldCheck,
+  UserRound,
+  X,
+  type LucideIcon,
+} from 'lucide-react';
 import { encode as encodeQR } from 'uqr';
 import {
   api,
@@ -12,9 +30,9 @@ import {
 } from '../lib/api';
 import { POSTER_BADGE_OPTIONS } from '../lib/posterBadges';
 import { resolveSubtitleStyle } from '../lib/subtitleStyle';
-import { SubtitleStyleControls } from './SubtitleStyleControls';
 import { useBodyScrollLock } from '../lib/useBodyScrollLock';
 import { AUTO_SKIP_DEFAULTS, SKIP_COUNTDOWN_SECONDS, normalizeAutoSkip } from '../lib/skipSegments';
+import { SubtitleStyleControls } from './SubtitleStyleControls';
 import { ThemeSwitcher } from './ThemeSwitcher';
 
 interface Props {
@@ -37,9 +55,171 @@ const LANGUAGES = [
   { code: 'it', label: 'Italian' },
 ];
 
+type SectionId = 'playback' | 'languages' | 'appearance' | 'account';
+
+const SECTIONS: { id: SectionId; label: string; description: string; icon: LucideIcon }[] = [
+  {
+    id: 'playback',
+    label: 'Playback',
+    description: 'Autoplay, chapter markers, and skipping intros & credits.',
+    icon: PlayCircle,
+  },
+  {
+    id: 'languages',
+    label: 'Audio & Subtitles',
+    description: 'Default tracks, anime Sub/Dub behaviour, and how subtitles look.',
+    icon: Languages,
+  },
+  {
+    id: 'appearance',
+    label: 'Appearance',
+    description: 'Theme, poster badges, and how Home groups your shows.',
+    icon: Palette,
+  },
+  {
+    id: 'account',
+    label: 'Account & Security',
+    description: 'Your display name and two-factor authentication.',
+    icon: UserRound,
+  },
+];
+
+const selectClass =
+  'w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-sm text-ink focus:outline-none focus:border-tone/50 cursor-pointer';
+const inputClass =
+  'rounded-lg bg-surface border border-hairline px-3 py-2 text-base sm:text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50';
+
+/** 2FA fields live inside the preferences form; Enter there must not save preferences. */
+function noSubmitOnEnter(e: ReactKeyboardEvent<HTMLInputElement>) {
+  if (e.key === 'Enter') e.preventDefault();
+}
+
+/** A titled card of settings rows separated by hairlines. */
+function SettingsGroup({ title, footer, children }: { title?: string; footer?: ReactNode; children: ReactNode }) {
+  return (
+    <section className="space-y-2">
+      {title && (
+        <h3 className="px-1 text-[11px] font-semibold uppercase tracking-widest text-ink-secondary">{title}</h3>
+      )}
+      <div className="rounded-xl bg-canvas/50 border border-tone/[0.08] divide-y divide-tone/[0.06]">{children}</div>
+      {footer && <p className="px-1 text-xs text-ink-muted leading-relaxed">{footer}</p>}
+    </section>
+  );
+}
+
+/** One setting: title and description on the left, its control on the right (or below when `stacked`). */
+function SettingRow({
+  title,
+  description,
+  control,
+  stacked = false,
+  children,
+}: {
+  title: ReactNode;
+  description?: ReactNode;
+  control?: ReactNode;
+  stacked?: boolean;
+  children?: ReactNode;
+}) {
+  return (
+    <div className="px-4 py-3.5 space-y-3">
+      <div
+        className={
+          stacked ? 'space-y-1' : 'flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-6'
+        }
+      >
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-medium text-ink">{title}</div>
+          {description && <div className="text-xs text-ink-muted mt-0.5 leading-relaxed">{description}</div>}
+        </div>
+        {control && <div className="shrink-0">{control}</div>}
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors cursor-pointer ${
+        checked ? 'bg-accent border-accent' : 'bg-elevated border-hairline'
+      }`}
+    >
+      <span
+        className={`inline-block h-4.5 w-4.5 rounded-full transition-transform ${
+          checked ? 'translate-x-[22px] bg-on-accent' : 'translate-x-0.5 bg-ink-secondary'
+        }`}
+      />
+    </button>
+  );
+}
+
+function ToggleRow({
+  title,
+  description,
+  checked,
+  onChange,
+}: {
+  title: string;
+  description: ReactNode;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="px-4 py-3.5 flex items-center justify-between gap-6">
+      <div className="min-w-0">
+        <div className="text-sm font-medium text-ink">{title}</div>
+        <div className="text-xs text-ink-muted mt-0.5 leading-relaxed">{description}</div>
+      </div>
+      <Toggle checked={checked} onChange={onChange} label={title} />
+    </div>
+  );
+}
+
+function PresetCard({
+  active,
+  title,
+  detail,
+  onClick,
+}: {
+  active: boolean;
+  title: string;
+  detail: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-pressed={active}
+      onClick={onClick}
+      className={`rounded-xl border px-3.5 py-3 text-left transition-colors cursor-pointer ${
+        active
+          ? 'bg-tone/12 border-tone/40 text-ink'
+          : 'bg-canvas/70 border-hairline text-ink-secondary hover:text-ink'
+      }`}
+    >
+      <div className="text-sm font-semibold flex items-center justify-between gap-2">
+        <span>{title}</span>
+        {active && <Check className="w-4 h-4 text-ink shrink-0" />}
+      </div>
+      <div className="text-xs text-ink-muted mt-0.5">{detail}</div>
+    </button>
+  );
+}
+
 export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }: Props) {
   useBodyScrollLock(true);
+  const [section, setSection] = useState<SectionId>('playback');
   const [name, setName] = useState(displayName);
+  // The server's preferences PATCH replaces the whole object, so saves start from the
+  // last-known preferences and fields this modal doesn't edit (max_bitrate, future ones) survive.
+  const [basePrefs, setBasePrefs] = useState<UserPreferences | undefined>(initialPrefs);
   const [audioLang, setAudioLang] = useState(initialPrefs?.audio_language ?? '');
   const [subLang, setSubLang] = useState(initialPrefs?.subtitle_language ?? 'en');
   const [subsEnabled, setSubsEnabled] = useState(initialPrefs?.subtitles_enabled ?? false);
@@ -76,25 +256,41 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
   const [copiedSecret, setCopiedSecret] = useState(false);
   const [showManualKey, setShowManualKey] = useState(false);
   const totpSectionRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   const qrMatrix = useMemo(() => {
     if (!totpSetup?.otpauth_url) return null;
     return encodeQR(totpSetup.otpauth_url, { ecc: 'M', border: 2 });
   }, [totpSetup?.otpauth_url]);
 
+  const activeSection = SECTIONS.find((s) => s.id === section) ?? SECTIONS[0];
+
+  useEffect(() => {
+    contentRef.current?.scrollTo({ top: 0 });
+  }, [section]);
+
   useEffect(() => {
     if (totpSetup || totpDisabling || (recoveryCodes && recoveryCodes.length > 0)) {
       requestAnimationFrame(() => {
-        totpSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        totpSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       });
     }
   }, [totpSetup, totpDisabling, recoveryCodes, showManualKey]);
+
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose();
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
 
   useEffect(() => {
     api
       .getUserProfile()
       .then((profile) => {
         setName(profile.display_name);
+        setBasePrefs(profile.preferences);
         setAudioLang(profile.preferences.audio_language ?? '');
         setSubLang(profile.preferences.subtitle_language ?? 'en');
         setSubsEnabled(Boolean(profile.preferences.subtitles_enabled));
@@ -169,11 +365,11 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
     setError('');
     try {
       const prefs: UserPreferences = {
+        ...basePrefs,
         audio_language: audioLang || undefined,
         subtitle_language: subLang || undefined,
         subtitles_enabled: subsEnabled,
         autoplay_next: autoplayNext,
-        max_bitrate: initialPrefs?.max_bitrate,
         combine_next_up: combineNextUp,
         show_chapter_markers: showChapterMarkers,
         poster_badges: posterBadges,
@@ -195,579 +391,573 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
     }
   }
 
+  const subbedActive = audioLang === '' && subLang === 'en' && !subsEnabled;
+  const dubbedActive = audioLang === 'en' && !subsEnabled;
+
+  const skipSelect = (label: string, value: AutoSkipMode, setValue: (v: AutoSkipMode) => void) => (
+    <select
+      value={value}
+      onChange={(e) => setValue(e.target.value as AutoSkipMode)}
+      aria-label={`Auto-skip ${label.toLowerCase()}`}
+      className={`${selectClass} sm:w-56`}
+    >
+      <option value="off">Show Skip button</option>
+      <option value="countdown">Skip after {SKIP_COUNTDOWN_SECONDS} seconds</option>
+      <option value="instant">Skip instantly</option>
+    </select>
+  );
+
   return (
     <div
-      className="fixed inset-0 z-50 bg-black/55 backdrop-blur-md flex items-center justify-center p-4"
+      className="fixed inset-0 z-50 bg-black/55 backdrop-blur-md flex items-center justify-center sm:p-6"
       onClick={onClose}
     >
-      <div
+      <form
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="prefs-title"
+        onSubmit={handleSubmit}
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md max-h-[90dvh] overflow-y-auto rounded-2xl bg-surface/88 backdrop-blur-xl backdrop-saturate-150 border border-tone/12 shadow-2xl p-4 sm:p-6 space-y-5"
+        className="w-full h-dvh sm:h-[min(720px,88dvh)] sm:max-w-4xl flex flex-col sm:flex-row overflow-hidden sm:rounded-2xl bg-surface/90 backdrop-blur-xl backdrop-saturate-150 sm:border border-tone/12 shadow-2xl"
       >
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-base font-semibold text-ink">Playback Preferences</h2>
-            <p className="text-xs text-ink-secondary mt-0.5">
-              Customize default audio, subtitles, and anime Sub/Dub behavior.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-lg text-ink-secondary hover:text-ink hover:bg-elevated cursor-pointer"
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-
-        {/* Appearance */}
-        <div className="flex flex-wrap items-center justify-between gap-3 pb-4 border-b border-tone/[0.08]">
-          <div>
-            <div className="text-xs font-medium text-ink">Appearance</div>
-            <div className="text-[11px] text-ink-muted">Match device setting, Light, or Dark.</div>
-          </div>
-          <ThemeSwitcher variant="labeled" />
-        </div>
-
-        {/* One-click Language Presets */}
-        <div className="space-y-2">
-          <div>
-            <div className="text-[10px] font-semibold uppercase tracking-widest text-ink-secondary flex items-center gap-1.5">
-              <Sparkles className="w-3 h-3 text-ink" />
-              Quick Audio &amp; Anime Presets
+        {/* Section rail (sm+) / tab strip (mobile) */}
+        <aside className="shrink-0 sm:w-60 border-b sm:border-b-0 sm:border-r border-tone/[0.08] bg-canvas/30 flex flex-col">
+          <div className="flex items-center justify-between px-4 pt-4 pb-3 sm:px-5 sm:pt-6 sm:pb-4">
+            <div className="min-w-0">
+              <h2 id="prefs-title" className="text-lg font-semibold text-ink">
+                Preferences
+              </h2>
+              <p className="text-xs text-ink-muted truncate">{name.trim() || displayName}</p>
             </div>
-            <p className="text-[11px] text-ink-muted mt-0.5">
-              Fills the defaults below. <span className="text-ink-secondary">Subbed</span> keeps
-              original audio for movies/TV and plays anime in Japanese with English subs.
-            </p>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                setAudioLang('');
-                setSubLang('en');
-                setSubsEnabled(false);
-              }}
-              className={`rounded-xl border px-3 py-2.5 text-left transition-colors cursor-pointer ${
-                audioLang === '' && subLang === 'en' && !subsEnabled
-                  ? 'bg-tone/12 border-tone/40 text-ink'
-                  : 'bg-canvas/70 border-hairline text-ink-secondary hover:text-ink'
-              }`}
-            >
-              <div className="text-xs font-semibold flex items-center justify-between">
-                <span>Subbed (Original + EN)</span>
-                {audioLang === '' && subLang === 'en' && !subsEnabled && (
-                  <Check className="w-3.5 h-3.5 text-ink" />
-                )}
-              </div>
-              <div className="text-[10px] text-ink-muted mt-0.5">
-                Original / Anime JP · Auto EN subs
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => {
-                setAudioLang('en');
-                setSubLang('en');
-                setSubsEnabled(false);
-              }}
-              className={`rounded-xl border px-3 py-2.5 text-left transition-colors cursor-pointer ${
-                audioLang === 'en' && !subsEnabled
-                  ? 'bg-tone/12 border-tone/40 text-ink'
-                  : 'bg-canvas/70 border-hairline text-ink-secondary hover:text-ink'
-              }`}
-            >
-              <div className="text-xs font-semibold flex items-center justify-between">
-                <span>Dubbed (English)</span>
-                {audioLang === 'en' && !subsEnabled && (
-                  <Check className="w-3.5 h-3.5 text-ink" />
-                )}
-              </div>
-              <div className="text-[10px] text-ink-muted mt-0.5">
-                Prefer English audio · Signs &amp; Songs
-              </div>
-            </button>
-          </div>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-ink flex items-center gap-1.5">
-              <Languages className="w-3.5 h-3.5 text-ink-secondary" />
-              Preferred Audio Language
-            </label>
-            <select
-              value={audioLang}
-              onChange={(e) => setAudioLang(e.target.value)}
-              className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-xs text-ink focus:outline-none focus:border-tone/50"
-            >
-              {LANGUAGES.map((l) => (
-                <option key={l.code || 'auto'} value={l.code}>
-                  {l.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-ink flex items-center gap-1.5">
-              <Subtitles className="w-3.5 h-3.5 text-ink-secondary" />
-              Preferred Subtitle Language
-            </label>
-            <select
-              value={subLang}
-              onChange={(e) => setSubLang(e.target.value)}
-              className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-xs text-ink focus:outline-none focus:border-tone/50"
-            >
-              {LANGUAGES.filter((l) => l.code !== '').map((l) => (
-                <option key={l.code} value={l.code}>
-                  {l.label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="space-y-2.5 pt-1">
-            <label className="flex items-center justify-between gap-3 cursor-pointer">
-              <div>
-                <div className="text-xs font-medium text-ink">Always enable full subtitles</div>
-                <div className="text-[11px] text-ink-muted">
-                  When off, anime in Japanese still auto-enables subs; English dubs show Signs &amp; Songs.
-                </div>
-              </div>
-              <input
-                type="checkbox"
-                checked={subsEnabled}
-                onChange={(e) => setSubsEnabled(e.target.checked)}
-                className="accent-accent w-4 h-4 shrink-0"
-              />
-            </label>
-
-            <div className="pt-2.5 border-t border-tone/[0.06] space-y-2">
-              <div>
-                <div className="text-xs font-medium text-ink flex items-center gap-1.5">
-                  <Subtitles className="w-3.5 h-3.5 text-ink-secondary" />
-                  Subtitle Appearance
-                </div>
-                <div className="text-[11px] text-ink-muted">
-                  Synced to your account, so every Lune app uses the same style.
-                </div>
-              </div>
-              <SubtitleStyleControls
-                value={subStyle}
-                onChange={(next) => {
-                  subStyleTouchedRef.current = true;
-                  setSubStyle(next);
-                }}
-                showPreview
-              />
-            </div>
-
-            <label className="flex items-center justify-between gap-3 cursor-pointer">
-              <div>
-                <div className="text-xs font-medium text-ink">Autoplay next episode</div>
-                <div className="text-[11px] text-ink-muted">
-                  Automatically advance through Up Next countdown when an episode finishes.
-                </div>
-              </div>
-              <input
-                type="checkbox"
-                checked={autoplayNext}
-                onChange={(e) => setAutoplayNext(e.target.checked)}
-                className="accent-accent w-4 h-4 shrink-0"
-              />
-            </label>
-
-            <div className="flex items-center justify-between gap-3 pt-1 border-t border-tone/[0.06]">
-              <div>
-                <div className="text-xs font-medium text-ink">
-                  Combine Next Up into Continue Watching
-                </div>
-                <div className="text-[11px] text-ink-muted">
-                  Merge upcoming episodes into the Continue Watching shelf, sorted by recent activity.
-                </div>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={combineNextUp}
-                aria-label="Combine Next Up into Continue Watching"
-                onClick={() => setCombineNextUp((v) => !v)}
-                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors cursor-pointer ${
-                  combineNextUp
-                    ? 'bg-accent border-accent'
-                    : 'bg-elevated border-hairline'
-                }`}
-              >
-                <span
-                  className={`inline-block h-3.5 w-3.5 rounded-full transition-transform ${
-                    combineNextUp
-                      ? 'translate-x-[18px] bg-on-accent'
-                      : 'translate-x-0.5 bg-ink-secondary'
-                  }`}
-                />
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between gap-3 pt-1 border-t border-tone/[0.06]">
-              <div>
-                <div className="text-xs font-medium text-ink">Show chapter markers</div>
-                <div className="text-[11px] text-ink-muted">
-                  Draw chapter tick marks on the player&apos;s progress bar. Skip Intro still works when off.
-                </div>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={showChapterMarkers}
-                aria-label="Show chapter markers"
-                onClick={() => setShowChapterMarkers((v) => !v)}
-                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors cursor-pointer ${
-                  showChapterMarkers
-                    ? 'bg-accent border-accent'
-                    : 'bg-elevated border-hairline'
-                }`}
-              >
-                <span
-                  className={`inline-block h-3.5 w-3.5 rounded-full transition-transform ${
-                    showChapterMarkers
-                      ? 'translate-x-[18px] bg-on-accent'
-                      : 'translate-x-0.5 bg-ink-secondary'
-                  }`}
-                />
-              </button>
-            </div>
-
-            <div className="pt-2.5 border-t border-tone/[0.06] space-y-2">
-              <div>
-                <div className="text-xs font-medium text-ink">Skip intros &amp; credits</div>
-                <div className="text-[11px] text-ink-muted">
-                  From the file&apos;s chapters or IntroDB&apos;s community timestamps. Credits apply to episodes only;
-                  movie credits are never skipped automatically. Synced to all your devices.
-                </div>
-              </div>
-              {(
-                [
-                  ['Intro', autoSkipIntro, setAutoSkipIntro],
-                  ['Recap', autoSkipRecap, setAutoSkipRecap],
-                  ['Credits', autoSkipCredits, setAutoSkipCredits],
-                ] as const
-              ).map(([label, value, setValue]) => (
-                <label key={label} className="flex items-center justify-between gap-3">
-                  <span className="text-xs text-ink-secondary">{label}</span>
-                  <select
-                    value={value}
-                    onChange={(e) => setValue(e.target.value as AutoSkipMode)}
-                    aria-label={`Auto-skip ${label.toLowerCase()}`}
-                    className="w-44 rounded-lg bg-canvas border border-hairline px-3 py-1.5 text-base sm:text-xs text-ink focus:outline-none focus:border-tone/50"
-                  >
-                    <option value="off">Show Skip button</option>
-                    <option value="countdown">Skip after {SKIP_COUNTDOWN_SECONDS} seconds</option>
-                    <option value="instant">Skip instantly</option>
-                  </select>
-                </label>
-              ))}
-            </div>
-
-            <div className="pt-2.5 border-t border-tone/[0.06] space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <div className="text-xs font-medium text-ink flex items-center gap-1.5">
-                    <Tags className="w-3.5 h-3.5 text-ink-secondary" />
-                    Poster Badges
-                  </div>
-                  <div className="text-[11px] text-ink-muted">
-                    Choose which metadata pills appear over poster artwork. Default is none.
-                  </div>
-                </div>
-                {posterBadges.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setPosterBadges([])}
-                    className="text-[11px] text-ink-secondary hover:text-ink underline underline-offset-2 shrink-0 cursor-pointer"
-                  >
-                    Clear all
-                  </button>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {POSTER_BADGE_OPTIONS.map((opt) => {
-                  const active = posterBadges.includes(opt.id);
-                  return (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      aria-pressed={active}
-                      onClick={() =>
-                        setPosterBadges((prev) =>
-                          prev.includes(opt.id)
-                            ? prev.filter((b) => b !== opt.id)
-                            : [...prev, opt.id],
-                        )
-                      }
-                      className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs transition-colors cursor-pointer ${
-                        active
-                          ? 'bg-tone/12 border-tone/40 text-ink font-medium'
-                          : 'bg-canvas/70 border-hairline text-ink-secondary hover:text-ink'
-                      }`}
-                    >
-                      {active && <Check className="w-3 h-3 text-ink shrink-0" />}
-                      <span>{opt.label}</span>
-                      <span className="text-[10px] text-ink-muted tabular-nums">{opt.example}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-
-          {error && (
-            <div className="rounded-lg bg-danger/10 border border-danger/30 px-3 py-2 text-xs text-danger">
-              {error}
-            </div>
-          )}
-
-          <div className="flex items-center justify-end gap-2 pt-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-3.5 py-2 rounded-lg text-xs text-ink-secondary hover:text-ink cursor-pointer"
+              aria-label="Close"
+              className="sm:hidden p-2 rounded-lg text-ink-secondary hover:text-ink hover:bg-elevated cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          <nav
+            aria-label="Preference sections"
+            className="flex sm:flex-col gap-1 overflow-x-auto no-scrollbar px-3 pb-3 sm:pb-4"
+          >
+            {SECTIONS.map((s) => {
+              const Icon = s.icon;
+              const active = s.id === section;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  aria-current={active ? 'page' : undefined}
+                  onClick={() => setSection(s.id)}
+                  className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium whitespace-nowrap transition-colors cursor-pointer ${
+                    active ? 'bg-elevated text-ink' : 'text-ink-secondary hover:text-ink hover:bg-canvas/50'
+                  }`}
+                >
+                  <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-ink' : 'text-ink-muted'}`} />
+                  {s.label}
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
+
+        {/* Active section */}
+        <div className="flex-1 min-w-0 min-h-0 flex flex-col">
+          <header className="hidden sm:flex items-start justify-between gap-4 px-8 pt-6 pb-4">
+            <div>
+              <h3 className="text-base font-semibold text-ink">{activeSection.label}</h3>
+              <p className="text-sm text-ink-secondary mt-0.5">{activeSection.description}</p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close"
+              className="p-1.5 -mr-2 rounded-lg text-ink-secondary hover:text-ink hover:bg-elevated cursor-pointer"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </header>
+
+          <div
+            ref={contentRef}
+            className="flex-1 min-h-0 overflow-y-auto px-4 py-4 sm:px-8 sm:pt-2 sm:pb-6 space-y-6"
+          >
+            {section === 'playback' && (
+              <>
+                <SettingsGroup title="Player">
+                  <ToggleRow
+                    title="Autoplay next episode"
+                    description="Advance through the Up Next countdown when an episode finishes."
+                    checked={autoplayNext}
+                    onChange={setAutoplayNext}
+                  />
+                  <ToggleRow
+                    title="Show chapter markers"
+                    description="Draw chapter tick marks on the progress bar. Skip buttons still appear when off."
+                    checked={showChapterMarkers}
+                    onChange={setShowChapterMarkers}
+                  />
+                </SettingsGroup>
+
+                <SettingsGroup
+                  title="Skip intros & credits"
+                  footer={
+                    <>
+                      Segments come from the file&apos;s chapters or IntroDB&apos;s community timestamps. Movie
+                      credits are never skipped automatically. Synced to all your devices.
+                    </>
+                  }
+                >
+                  <SettingRow title="Intro" control={skipSelect('Intro', autoSkipIntro, setAutoSkipIntro)} />
+                  <SettingRow title="Recap" control={skipSelect('Recap', autoSkipRecap, setAutoSkipRecap)} />
+                  <SettingRow
+                    title="Credits"
+                    description="Episodes only."
+                    control={skipSelect('Credits', autoSkipCredits, setAutoSkipCredits)}
+                  />
+                </SettingsGroup>
+              </>
+            )}
+
+            {section === 'languages' && (
+              <>
+                <SettingsGroup
+                  title="Quick presets"
+                  footer={
+                    <>
+                      Fills the defaults below. <span className="text-ink-secondary">Subbed</span> keeps original
+                      audio for movies &amp; TV and plays anime in Japanese with English subs.
+                    </>
+                  }
+                >
+                  <div className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <PresetCard
+                      active={subbedActive}
+                      title="Subbed (Original + EN)"
+                      detail="Original / Anime JP · Auto EN subs"
+                      onClick={() => {
+                        setAudioLang('');
+                        setSubLang('en');
+                        setSubsEnabled(false);
+                      }}
+                    />
+                    <PresetCard
+                      active={dubbedActive}
+                      title="Dubbed (English)"
+                      detail="Prefer English audio · Signs & Songs"
+                      onClick={() => {
+                        setAudioLang('en');
+                        setSubLang('en');
+                        setSubsEnabled(false);
+                      }}
+                    />
+                  </div>
+                </SettingsGroup>
+
+                <SettingsGroup title="Defaults">
+                  <SettingRow
+                    title="Audio language"
+                    control={
+                      <select
+                        value={audioLang}
+                        onChange={(e) => setAudioLang(e.target.value)}
+                        aria-label="Preferred audio language"
+                        className={`${selectClass} sm:w-64`}
+                      >
+                        {LANGUAGES.map((l) => (
+                          <option key={l.code || 'auto'} value={l.code}>
+                            {l.label}
+                          </option>
+                        ))}
+                      </select>
+                    }
+                  />
+                  <SettingRow
+                    title="Subtitle language"
+                    control={
+                      <select
+                        value={subLang}
+                        onChange={(e) => setSubLang(e.target.value)}
+                        aria-label="Preferred subtitle language"
+                        className={`${selectClass} sm:w-64`}
+                      >
+                        {LANGUAGES.filter((l) => l.code !== '').map((l) => (
+                          <option key={l.code} value={l.code}>
+                            {l.label}
+                          </option>
+                        ))}
+                      </select>
+                    }
+                  />
+                  <ToggleRow
+                    title="Always enable full subtitles"
+                    description="When off, anime in Japanese still auto-enables subs; English dubs show Signs & Songs."
+                    checked={subsEnabled}
+                    onChange={setSubsEnabled}
+                  />
+                </SettingsGroup>
+
+                <SettingsGroup
+                  title="Subtitle appearance"
+                  footer="Synced to your account, so every Lune app uses the same style."
+                >
+                  <div className="p-4">
+                    <SubtitleStyleControls
+                      value={subStyle}
+                      onChange={(next) => {
+                        subStyleTouchedRef.current = true;
+                        setSubStyle(next);
+                      }}
+                      showPreview
+                    />
+                  </div>
+                </SettingsGroup>
+              </>
+            )}
+
+            {section === 'appearance' && (
+              <>
+                <SettingsGroup title="Theme">
+                  <SettingRow
+                    title="Appearance"
+                    description="Match your device setting, or always use Light or Dark."
+                    control={<ThemeSwitcher variant="labeled" />}
+                  />
+                </SettingsGroup>
+
+                <SettingsGroup title="Home">
+                  <ToggleRow
+                    title="Combine Next Up into Continue Watching"
+                    description="Merge upcoming episodes into the Continue Watching shelf, sorted by recent activity."
+                    checked={combineNextUp}
+                    onChange={setCombineNextUp}
+                  />
+                </SettingsGroup>
+
+                <SettingsGroup title="Posters">
+                  <SettingRow
+                    stacked
+                    title="Poster badges"
+                    description="Choose which metadata pills appear over poster artwork. Default is none."
+                    control={
+                      posterBadges.length > 0 ? (
+                        <button
+                          type="button"
+                          onClick={() => setPosterBadges([])}
+                          className="text-xs text-ink-secondary hover:text-ink underline underline-offset-2 cursor-pointer"
+                        >
+                          Clear all
+                        </button>
+                      ) : undefined
+                    }
+                  >
+                    <div className="flex flex-wrap gap-2">
+                      {POSTER_BADGE_OPTIONS.map((opt) => {
+                        const active = posterBadges.includes(opt.id);
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            aria-pressed={active}
+                            onClick={() =>
+                              setPosterBadges((prev) =>
+                                prev.includes(opt.id) ? prev.filter((b) => b !== opt.id) : [...prev, opt.id],
+                              )
+                            }
+                            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm transition-colors cursor-pointer ${
+                              active
+                                ? 'bg-tone/12 border-tone/40 text-ink font-medium'
+                                : 'bg-canvas/70 border-hairline text-ink-secondary hover:text-ink'
+                            }`}
+                          >
+                            {active && <Check className="w-3.5 h-3.5 text-ink shrink-0" />}
+                            <span>{opt.label}</span>
+                            <span className="text-xs text-ink-muted tabular-nums">{opt.example}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </SettingRow>
+                </SettingsGroup>
+              </>
+            )}
+
+            {section === 'account' && (
+              <>
+                <SettingsGroup title="Profile">
+                  <SettingRow
+                    title="Display name"
+                    description="Shown in the header and to admins in the console."
+                    control={
+                      <input
+                        type="text"
+                        value={name}
+                        maxLength={64}
+                        onChange={(e) => setName(e.target.value)}
+                        aria-label="Display name"
+                        className={`${inputClass} w-full sm:w-64 bg-canvas`}
+                      />
+                    }
+                  />
+                </SettingsGroup>
+
+                <SettingsGroup title="Security">
+                  <div ref={totpSectionRef}>
+                    <SettingRow
+                      title={
+                        <span className="flex items-center gap-2">
+                          <ShieldCheck className="w-4 h-4 text-healthy" />
+                          Two-factor authentication
+                        </span>
+                      }
+                      description={
+                        totpEnabled
+                          ? 'Protected with an authenticator app (TOTP).'
+                          : 'Require a 6-digit authenticator code when signing in.'
+                      }
+                      control={
+                        <>
+                          {!totpEnabled && !totpSetup && (
+                            <button
+                              type="button"
+                              disabled={totpBusy}
+                              onClick={handleStartTOTP}
+                              className="px-3.5 py-2 rounded-lg bg-elevated hover:bg-hairline border border-tone/12 text-sm font-medium text-ink transition-colors cursor-pointer"
+                            >
+                              Enable 2FA
+                            </button>
+                          )}
+                          {totpEnabled && !totpDisabling && !totpRequired && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setTotpDisabling(true);
+                                setTotpError('');
+                                setTotpPassword('');
+                                setTotpCode('');
+                              }}
+                              className="px-3.5 py-2 rounded-lg bg-danger/10 hover:bg-danger/20 border border-danger/30 text-sm font-medium text-danger transition-colors cursor-pointer"
+                            >
+                              Disable 2FA
+                            </button>
+                          )}
+                          {totpEnabled && totpRequired && (
+                            <span className="px-2.5 py-1 rounded-full bg-healthy/15 text-xs font-medium text-healthy">
+                              Required by admin
+                            </span>
+                          )}
+                        </>
+                      }
+                    >
+                      {totpSetup && (
+                        <div className="rounded-xl bg-canvas/80 border border-tone/10 p-4 space-y-4">
+                          <div className="text-xs text-ink-secondary leading-relaxed">
+                            Scan this QR code with your authenticator app (1Password, Apple Passwords, Bitwarden,
+                            Google Authenticator), then confirm with your password and a 6-digit code.
+                          </div>
+
+                          <div className="flex flex-col sm:flex-row sm:items-start gap-4">
+                            {qrMatrix && (
+                              <div className="flex flex-col items-center gap-2 shrink-0">
+                                <div className="rounded-xl bg-white p-2.5 shadow-sm border border-tone/10">
+                                  <svg
+                                    viewBox={`0 0 ${qrMatrix.size} ${qrMatrix.size}`}
+                                    className="w-40 h-40 block"
+                                    shapeRendering="crispEdges"
+                                    role="img"
+                                    aria-label="Two-factor authentication QR code"
+                                  >
+                                    <rect width={qrMatrix.size} height={qrMatrix.size} fill="#FFFFFF" />
+                                    {qrMatrix.data.map((row, y) =>
+                                      row.map((cell, x) =>
+                                        cell ? (
+                                          <rect key={`${x}-${y}`} x={x} y={y} width={1} height={1} fill="#09090B" />
+                                        ) : null,
+                                      ),
+                                    )}
+                                  </svg>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowManualKey((v) => !v)}
+                                  className="text-xs text-ink-secondary hover:text-ink underline underline-offset-2 cursor-pointer"
+                                >
+                                  {showManualKey ? 'Hide setup key' : "Can't scan? Show setup key"}
+                                </button>
+                              </div>
+                            )}
+
+                            <div className="flex-1 min-w-0 space-y-2.5">
+                              {showManualKey && (
+                                <div className="flex items-center gap-2">
+                                  <code className="flex-1 rounded-lg bg-surface border border-hairline px-3 py-2 text-xs font-mono text-ink break-all select-all">
+                                    {totpSetup.secret}
+                                  </code>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard?.writeText(totpSetup.secret).catch(() => {});
+                                      setCopiedSecret(true);
+                                      setTimeout(() => setCopiedSecret(false), 1800);
+                                    }}
+                                    className="p-2 rounded-lg bg-elevated hover:bg-hairline text-ink-secondary hover:text-ink cursor-pointer"
+                                    title="Copy secret"
+                                  >
+                                    {copiedSecret ? (
+                                      <Check className="w-4 h-4 text-healthy" />
+                                    ) : (
+                                      <Copy className="w-4 h-4" />
+                                    )}
+                                  </button>
+                                </div>
+                              )}
+                              <input
+                                type="password"
+                                value={totpPassword}
+                                onChange={(e) => setTotpPassword(e.target.value)}
+                                onKeyDown={noSubmitOnEnter}
+                                placeholder="Current password"
+                                autoComplete="current-password"
+                                className={`${inputClass} w-full`}
+                              />
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                autoComplete="one-time-code"
+                                value={totpCode}
+                                onChange={(e) => setTotpCode(e.target.value)}
+                                onKeyDown={noSubmitOnEnter}
+                                placeholder="6-digit code"
+                                className={`${inputClass} w-full font-mono tabular-nums`}
+                              />
+                              <div className="flex items-center justify-end gap-2 pt-1">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setTotpSetup(null);
+                                    setTotpError('');
+                                  }}
+                                  className="px-3 py-2 rounded-lg text-sm text-ink-secondary hover:text-ink cursor-pointer"
+                                >
+                                  Cancel
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={totpBusy || !totpPassword || totpCode.trim().length < 6}
+                                  onClick={handleEnableTOTP}
+                                  className="px-3.5 py-2 rounded-lg bg-accent hover:bg-accent-hover disabled:opacity-50 text-on-accent font-semibold text-sm cursor-pointer"
+                                >
+                                  {totpBusy ? 'Verifying…' : 'Verify & Enable'}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {totpDisabling && (
+                        <div className="rounded-xl bg-canvas/80 border border-danger/25 p-4 space-y-3">
+                          <div className="text-xs text-ink-secondary">
+                            Confirm your password and a current authenticator (or recovery) code to disable 2FA.
+                          </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                            <input
+                              type="password"
+                              value={totpPassword}
+                              onChange={(e) => setTotpPassword(e.target.value)}
+                              onKeyDown={noSubmitOnEnter}
+                              placeholder="Current password"
+                              autoComplete="current-password"
+                              className={inputClass}
+                            />
+                            <input
+                              type="text"
+                              value={totpCode}
+                              onChange={(e) => setTotpCode(e.target.value)}
+                              onKeyDown={noSubmitOnEnter}
+                              placeholder="Code or XXXX-XXXX"
+                              autoComplete="one-time-code"
+                              className={`${inputClass} font-mono`}
+                            />
+                          </div>
+                          <div className="flex items-center justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setTotpDisabling(false);
+                                setTotpError('');
+                              }}
+                              className="px-3 py-2 rounded-lg text-sm text-ink-secondary hover:text-ink cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              disabled={totpBusy || !totpPassword || !totpCode.trim()}
+                              onClick={handleDisableTOTP}
+                              className="px-3.5 py-2 rounded-lg bg-danger text-white font-semibold text-sm disabled:opacity-50 cursor-pointer"
+                            >
+                              {totpBusy ? 'Disabling…' : 'Confirm Disable'}
+                            </button>
+                          </div>
+                        </div>
+                      )}
+
+                      {recoveryCodes && recoveryCodes.length > 0 && (
+                        <div className="rounded-xl bg-healthy/10 border border-healthy/30 p-4 space-y-2.5">
+                          <div className="text-sm font-semibold text-healthy">
+                            2FA enabled. Save your one-time recovery codes
+                          </div>
+                          <p className="text-xs text-ink-secondary">
+                            Store these codes somewhere safe. Each code can be used once if you lose your
+                            authenticator device.
+                          </p>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-sm text-ink">
+                            {recoveryCodes.map((c) => (
+                              <div
+                                key={c}
+                                className="rounded bg-canvas/80 border border-hairline px-2 py-1.5 text-center select-all"
+                              >
+                                {c}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {totpError && (
+                        <div className="rounded-lg bg-danger/10 border border-danger/30 px-3 py-2 text-sm text-danger">
+                          {totpError}
+                        </div>
+                      )}
+                    </SettingRow>
+                  </div>
+                </SettingsGroup>
+              </>
+            )}
+          </div>
+
+          <footer className="shrink-0 flex items-center justify-end gap-3 px-4 pt-3 sm:px-8 sm:py-4 border-t border-tone/[0.08] bg-canvas/30 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            {error && <div className="mr-auto min-w-0 text-sm text-danger truncate">{error}</div>}
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-2 rounded-lg text-sm text-ink-secondary hover:text-ink cursor-pointer"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="px-4 py-2 rounded-lg bg-accent hover:bg-accent-hover text-on-accent font-semibold text-xs transition-colors cursor-pointer"
+              className="px-5 py-2 rounded-lg bg-accent hover:bg-accent-hover disabled:opacity-60 text-on-accent font-semibold text-sm transition-colors cursor-pointer"
             >
-              {saving ? 'Saving…' : 'Save Preferences'}
+              {saving ? 'Saving…' : 'Save'}
             </button>
-          </div>
-        </form>
-
-        {/* Two-Factor Authentication (TOTP) */}
-        <div ref={totpSectionRef} className="pt-4 border-t border-tone/[0.08] space-y-3">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <div className="text-xs font-semibold text-ink flex items-center gap-1.5">
-                <ShieldCheck className="w-3.5 h-3.5 text-healthy" />
-                Two-Factor Authentication (2FA)
-              </div>
-              <div className="text-[11px] text-ink-muted mt-0.5">
-                {totpEnabled
-                  ? 'Protected with an authenticator app (TOTP).'
-                  : 'Require a 6-digit authenticator code when signing in.'}
-              </div>
-            </div>
-            {!totpEnabled && !totpSetup && (
-              <button
-                type="button"
-                disabled={totpBusy}
-                onClick={handleStartTOTP}
-                className="px-3 py-1.5 rounded-lg bg-elevated hover:bg-hairline border border-tone/12 text-xs font-medium text-ink transition-colors cursor-pointer shrink-0"
-              >
-                Enable 2FA
-              </button>
-            )}
-            {totpEnabled && !totpDisabling && !totpRequired && (
-              <button
-                type="button"
-                onClick={() => {
-                  setTotpDisabling(true);
-                  setTotpError('');
-                  setTotpPassword('');
-                  setTotpCode('');
-                }}
-                className="px-3 py-1.5 rounded-lg bg-danger/10 hover:bg-danger/20 border border-danger/30 text-xs font-medium text-danger transition-colors cursor-pointer shrink-0"
-              >
-                Disable 2FA
-              </button>
-            )}
-            {totpEnabled && totpRequired && (
-              <span className="px-2.5 py-1 rounded-full bg-healthy/15 text-[10px] font-medium text-healthy shrink-0">
-                Required by admin
-              </span>
-            )}
-          </div>
-
-          {totpSetup && (
-            <div className="rounded-xl bg-canvas/80 border border-tone/10 p-3.5 space-y-3">
-              <div className="text-[11px] text-ink-secondary leading-relaxed">
-                Scan this QR code with your authenticator app (1Password, Apple Passwords, Bitwarden,
-                Google Authenticator), then confirm with your password and a 6-digit code.
-              </div>
-
-              {qrMatrix && (
-                <div className="flex flex-col items-center gap-2 py-1">
-                  <div className="rounded-xl bg-white p-2.5 shadow-sm border border-tone/10">
-                    <svg
-                      viewBox={`0 0 ${qrMatrix.size} ${qrMatrix.size}`}
-                      className="w-40 h-40 block"
-                      shapeRendering="crispEdges"
-                      role="img"
-                      aria-label="Two-factor authentication QR code"
-                    >
-                      <rect width={qrMatrix.size} height={qrMatrix.size} fill="#FFFFFF" />
-                      {qrMatrix.data.map((row, y) =>
-                        row.map((cell, x) =>
-                          cell ? (
-                            <rect
-                              key={`${x}-${y}`}
-                              x={x}
-                              y={y}
-                              width={1}
-                              height={1}
-                              fill="#09090B"
-                            />
-                          ) : null
-                        )
-                      )}
-                    </svg>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowManualKey((v) => !v)}
-                    className="text-[11px] text-ink-secondary hover:text-ink underline underline-offset-2 cursor-pointer"
-                  >
-                    {showManualKey ? 'Hide manual setup key' : "Can't scan? Enter setup key manually"}
-                  </button>
-                </div>
-              )}
-
-              {showManualKey && (
-                <div className="flex items-center gap-2">
-                  <code className="flex-1 rounded-lg bg-surface border border-hairline px-2.5 py-1.5 text-xs font-mono text-ink break-all select-all">
-                    {totpSetup.secret}
-                  </code>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      navigator.clipboard?.writeText(totpSetup.secret).catch(() => {});
-                      setCopiedSecret(true);
-                      setTimeout(() => setCopiedSecret(false), 1800);
-                    }}
-                    className="p-2 rounded-lg bg-elevated hover:bg-hairline text-ink-secondary hover:text-ink cursor-pointer"
-                    title="Copy secret"
-                  >
-                    {copiedSecret ? <Check className="w-3.5 h-3.5 text-healthy" /> : <Copy className="w-3.5 h-3.5" />}
-                  </button>
-                </div>
-              )}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <input
-                  type="password"
-                  value={totpPassword}
-                  onChange={(e) => setTotpPassword(e.target.value)}
-                  placeholder="Current password"
-                  className="rounded-lg bg-surface border border-hairline px-2.5 py-1.5 text-base sm:text-xs text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
-                />
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={totpCode}
-                  onChange={(e) => setTotpCode(e.target.value)}
-                  placeholder="6-digit code"
-                  className="rounded-lg bg-surface border border-hairline px-2.5 py-1.5 text-base sm:text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
-                />
-              </div>
-              <div className="flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTotpSetup(null);
-                    setTotpError('');
-                  }}
-                  className="px-2.5 py-1.5 rounded-lg text-xs text-ink-secondary hover:text-ink cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={totpBusy || !totpPassword || totpCode.trim().length < 6}
-                  onClick={handleEnableTOTP}
-                  className="px-3 py-1.5 rounded-lg bg-accent hover:bg-accent-hover disabled:opacity-50 text-on-accent font-semibold text-xs cursor-pointer"
-                >
-                  {totpBusy ? 'Verifying…' : 'Verify & Enable'}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {totpDisabling && (
-            <div className="rounded-xl bg-canvas/80 border border-danger/25 p-3.5 space-y-2.5">
-              <div className="text-[11px] text-ink-secondary">
-                Confirm your password and a current authenticator (or recovery) code to disable 2FA.
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <input
-                  type="password"
-                  value={totpPassword}
-                  onChange={(e) => setTotpPassword(e.target.value)}
-                  placeholder="Current password"
-                  className="rounded-lg bg-surface border border-hairline px-2.5 py-1.5 text-base sm:text-xs text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
-                />
-                <input
-                  type="text"
-                  value={totpCode}
-                  onChange={(e) => setTotpCode(e.target.value)}
-                  placeholder="Code or XXXX-XXXX"
-                  className="rounded-lg bg-surface border border-hairline px-2.5 py-1.5 text-base sm:text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
-                />
-              </div>
-              <div className="flex items-center justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTotpDisabling(false);
-                    setTotpError('');
-                  }}
-                  className="px-2.5 py-1.5 rounded-lg text-xs text-ink-secondary hover:text-ink cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={totpBusy || !totpPassword || !totpCode.trim()}
-                  onClick={handleDisableTOTP}
-                  className="px-3 py-1.5 rounded-lg bg-danger text-white font-semibold text-xs disabled:opacity-50 cursor-pointer"
-                >
-                  {totpBusy ? 'Disabling…' : 'Confirm Disable'}
-                </button>
-              </div>
-            </div>
-          )}
-
-          {recoveryCodes && recoveryCodes.length > 0 && (
-            <div className="rounded-xl bg-healthy/10 border border-healthy/30 p-3.5 space-y-2">
-              <div className="text-xs font-semibold text-healthy">
-                2FA Enabled — Save Your One-Time Recovery Codes
-              </div>
-              <p className="text-[11px] text-ink-secondary">
-                Store these codes somewhere safe. Each code can be used once if you lose your
-                authenticator device.
-              </p>
-              <div className="grid grid-cols-2 gap-1.5 font-mono text-xs text-ink">
-                {recoveryCodes.map((c) => (
-                  <div
-                    key={c}
-                    className="rounded bg-canvas/80 border border-hairline px-2 py-1 text-center select-all"
-                  >
-                    {c}
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {totpError && (
-            <div className="rounded-lg bg-danger/10 border border-danger/30 px-3 py-2 text-xs text-danger">
-              {totpError}
-            </div>
-          )}
+          </footer>
         </div>
-      </div>
+      </form>
     </div>
   );
 }
