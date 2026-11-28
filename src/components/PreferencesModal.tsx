@@ -44,7 +44,7 @@ interface Props {
 }
 
 const LANGUAGES = [
-  { code: '', label: 'Auto (Original / Anime JP)' },
+  { code: '', label: "File's default track" },
   { code: 'ja', label: 'Japanese (日本語)' },
   { code: 'en', label: 'English' },
   { code: 'es', label: 'Spanish' },
@@ -548,6 +548,11 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
                 <SettingsGroup title="Defaults">
                   <SettingRow
                     title="Audio language"
+                    description={
+                      audioLang
+                        ? "Plays this language when the file has it, otherwise the file's default track."
+                        : 'Plays whichever track the file marks as default, usually the original language.'
+                    }
                     control={
                       <select
                         value={audioLang}
@@ -581,11 +586,11 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
                     }
                   />
                   <ToggleRow
-                    title="Subtitles by default"
+                    title="Always show subtitles"
                     description={
                       animeAudio === 'auto'
-                        ? 'When off, anime in Japanese still auto-enables subs; English dubs show Signs & Songs.'
-                        : 'Movies, TV and other non-anime media. Anime follows the choice above.'
+                        ? "When off, subtitles still turn on when the audio isn't in your subtitle language."
+                        : "When off, subtitles still turn on when the audio isn't in your subtitle language. Anime follows the choice above."
                     }
                     checked={subsEnabled}
                     onChange={setSubsEnabled}
