@@ -26,6 +26,7 @@ import {
   type SubtitleStyle,
   type TOTPSetupResponse,
   type AutoSkipMode,
+  type AnimeAudioMode,
   type UserPreferences,
 } from '../lib/api';
 import { POSTER_BADGE_OPTIONS } from '../lib/posterBadges';
@@ -223,6 +224,7 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
   const [audioLang, setAudioLang] = useState(initialPrefs?.audio_language ?? '');
   const [subLang, setSubLang] = useState(initialPrefs?.subtitle_language ?? 'en');
   const [subsEnabled, setSubsEnabled] = useState(initialPrefs?.subtitles_enabled ?? false);
+  const [animeAudio, setAnimeAudio] = useState<AnimeAudioMode>(initialPrefs?.anime_audio ?? 'auto');
   const [autoplayNext, setAutoplayNext] = useState(initialPrefs?.autoplay_next ?? true);
   const [combineNextUp, setCombineNextUp] = useState(initialPrefs?.combine_next_up ?? true);
   const [showChapterMarkers, setShowChapterMarkers] = useState(
@@ -294,6 +296,7 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
         setAudioLang(profile.preferences.audio_language ?? '');
         setSubLang(profile.preferences.subtitle_language ?? 'en');
         setSubsEnabled(Boolean(profile.preferences.subtitles_enabled));
+        setAnimeAudio(profile.preferences.anime_audio ?? 'auto');
         setAutoplayNext(profile.preferences.autoplay_next ?? true);
         setCombineNextUp(profile.preferences.combine_next_up ?? true);
         setShowChapterMarkers(profile.preferences.show_chapter_markers ?? true);
@@ -369,6 +372,7 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
         audio_language: audioLang || undefined,
         subtitle_language: subLang || undefined,
         subtitles_enabled: subsEnabled,
+        anime_audio: animeAudio,
         autoplay_next: autoplayNext,
         combine_next_up: combineNextUp,
         show_chapter_markers: showChapterMarkers,
@@ -390,9 +394,6 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
       setSaving(false);
     }
   }
-
-  const subbedActive = audioLang === '' && subLang === 'en' && !subsEnabled;
-  const dubbedActive = audioLang === 'en' && !subsEnabled;
 
   const skipSelect = (label: string, value: AutoSkipMode, setValue: (v: AutoSkipMode) => void) => (
     <select
@@ -525,34 +526,21 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
             {section === 'languages' && (
               <>
                 <SettingsGroup
-                  title="Quick presets"
-                  footer={
-                    <>
-                      Fills the defaults below. <span className="text-ink-secondary">Subbed</span> keeps original
-                      audio for movies &amp; TV and plays anime in Japanese with English subs.
-                    </>
-                  }
+                  title="Anime"
+                  footer="Anime libraries only. Your defaults below still apply to movies, TV and everything else."
                 >
                   <div className="p-3 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <PresetCard
-                      active={subbedActive}
-                      title="Subbed (Original + EN)"
-                      detail="Original / Anime JP · Auto EN subs"
-                      onClick={() => {
-                        setAudioLang('');
-                        setSubLang('en');
-                        setSubsEnabled(false);
-                      }}
+                      active={animeAudio === 'subbed'}
+                      title="Subbed"
+                      detail="Japanese audio · Full subtitles"
+                      onClick={() => setAnimeAudio(animeAudio === 'subbed' ? 'auto' : 'subbed')}
                     />
                     <PresetCard
-                      active={dubbedActive}
-                      title="Dubbed (English)"
-                      detail="Prefer English audio · Signs & Songs"
-                      onClick={() => {
-                        setAudioLang('en');
-                        setSubLang('en');
-                        setSubsEnabled(false);
-                      }}
+                      active={animeAudio === 'dubbed'}
+                      title="Dubbed"
+                      detail="Your language · Signs & Songs only"
+                      onClick={() => setAnimeAudio(animeAudio === 'dubbed' ? 'auto' : 'dubbed')}
                     />
                   </div>
                 </SettingsGroup>
@@ -593,8 +581,12 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
                     }
                   />
                   <ToggleRow
-                    title="Always enable full subtitles"
-                    description="When off, anime in Japanese still auto-enables subs; English dubs show Signs & Songs."
+                    title="Subtitles by default"
+                    description={
+                      animeAudio === 'auto'
+                        ? 'When off, anime in Japanese still auto-enables subs; English dubs show Signs & Songs.'
+                        : 'Movies, TV and other non-anime media. Anime follows the choice above.'
+                    }
                     checked={subsEnabled}
                     onChange={setSubsEnabled}
                   />
