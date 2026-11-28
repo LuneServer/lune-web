@@ -1998,8 +1998,14 @@ export function TheaterPlayer({
             <div>
               Pipeline:{' '}
               <span className="text-ink">
-                Video {plan.video_copy ? 'Copy' : 'Transcode'} · Audio{' '}
-                {plan.audio_copy ? 'Copy' : 'Transcode (AAC)'}
+                {plan.mode === 'direct' ? (
+                  'Original file, unprocessed'
+                ) : (
+                  <>
+                    Video {plan.video_copy ? 'Original (remuxed)' : 'Transcoded'} · Audio{' '}
+                    {plan.audio_copy ? 'Original' : 'Transcoded (AAC)'}
+                  </>
+                )}
               </span>
             </div>
             {plan.mode === 'transcode' && (
