@@ -68,7 +68,7 @@ const DEFAULT_CONFIG: MaintenanceConfig = {
   audit_retention_days: 90,
   optimize_database: true,
   generate_chapter_thumbnails: true,
-  generate_trickplay: false,
+  generate_trickplay: true,
   trickplay_interval_seconds: 10,
   trickplay_width: 320,
 };
@@ -485,7 +485,13 @@ export function ConsoleMaintenance() {
           <div className="rounded-lg bg-canvas/50 border border-tone/[0.06] p-3.5 space-y-2">
             <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-ink-secondary">
               <span className="font-medium text-ink">
-                Last Pass Summary ({lastRun.trigger === 'manual' ? 'Manual' : lastRun.trigger === 'resume' ? 'Resumed' : 'Scheduled'}
+                Last Pass Summary ({lastRun.trigger === 'manual'
+                  ? 'Manual'
+                  : lastRun.trigger === 'resume'
+                    ? 'Resumed'
+                    : lastRun.trigger === 'new_media'
+                      ? 'New media'
+                      : 'Scheduled'}
                 {lastRun.task && lastRun.task in TASK_LABELS
                   ? ` · ${TASK_LABELS[lastRun.task as MaintenanceTask]}`
                   : ''}
@@ -511,6 +517,11 @@ export function ConsoleMaintenance() {
                     {(lastRun.trickplay_generated ?? 0) > 0 ? ` (+${lastRun.trickplay_generated} new)` : ''}
                     {(lastRun.trickplay_bytes ?? 0) > 0 ? ` · ${formatBytes(lastRun.trickplay_bytes ?? 0)} on disk` : ''}
                     {(lastRun.trickplay_failed ?? 0) > 0 ? ` · ${lastRun.trickplay_failed} unreadable` : ''}
+                  </span>
+                )}
+                {status?.new_media_pending && (
+                  <span className="text-muted">
+                    New media found: chapter stills and scrubbing previews start once the server is idle
                   </span>
                 )}
                 {(lastRun.skipped_chapters_busy || status?.chapters_resume_pending) && (
