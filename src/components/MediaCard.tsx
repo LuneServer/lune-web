@@ -2,6 +2,7 @@ import { Play, Star, X } from 'lucide-react';
 import {
   formatDuration,
   formatResolution,
+  formatTimeLeft,
   type MediaItemSummary,
   type PlaybackProgress,
   type PosterBadge,
@@ -28,6 +29,18 @@ export function MediaCard({
   removeLabel = 'Remove',
 }: Props) {
   const badges = usePosterBadges(posterBadges);
+  // Continue Watching shows the time left rather than the full runtime.
+  const totalMS = progress && progress.duration_ms > 0 ? progress.duration_ms : item.duration_ms;
+  const remainingMS =
+    progress && progress.position_ms > 0 && !progress.completed
+      ? Math.max(0, totalMS - progress.position_ms)
+      : 0;
+  const timeLabel =
+    remainingMS > 0
+      ? formatTimeLeft(remainingMS)
+      : item.duration_ms > 0
+        ? formatDuration(item.duration_ms)
+        : '';
   const resBadge = badges.has('resolution')
     ? formatResolution(item.video_width, item.video_height)
     : '';
@@ -122,9 +135,9 @@ export function MediaCard({
                 ? `S${String(item.season_number).padStart(2, '0')}E${String(item.episode_number).padStart(2, '0')} · ${item.title}`
                 : item.year ?? item.container?.toUpperCase() ?? 'Media'}
             </span>
-            {item.duration_ms > 0 && (
+            {timeLabel && (
               <span className="tabular-nums text-[10.5px] text-ink-muted shrink-0">
-                {formatDuration(item.duration_ms)}
+                {timeLabel}
               </span>
             )}
           </div>

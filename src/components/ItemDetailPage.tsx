@@ -26,6 +26,7 @@ import {
 import {
   api,
   formatDuration,
+  formatTimeLeft,
   formatResolution,
   type AudioTrack,
   type ChapterInfo,
@@ -824,7 +825,7 @@ export function ItemDetailPage({
               >
                 <Play className="w-4 h-4 fill-current shrink-0" />
                 <span className="truncate">
-                  {hasResume ? `Resume · ${formatDuration(remainingMS)} left` : 'Play'}
+                  {hasResume ? `Resume · ${formatTimeLeft(remainingMS)}` : 'Play'}
                 </span>
               </button>
 

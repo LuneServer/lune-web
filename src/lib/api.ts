@@ -1350,6 +1350,17 @@ export function formatDuration(ms: number): string {
   return `${s}s`;
 }
 
+/** Time left, as "1h 12m left" / "42m left" / "45s left": whole minutes, matching the Apple TV client. */
+export function formatTimeLeft(ms: number): string {
+  if (!ms || ms <= 0) return '';
+  const totalMin = Math.floor(ms / 60000);
+  if (totalMin < 1) return `${Math.max(1, Math.floor(ms / 1000))}s left`;
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h > 0) return m > 0 ? `${h}h ${m}m left` : `${h}h left`;
+  return `${m}m left`;
+}
+
 export function formatUptime(seconds: number): string {
   if (!seconds || seconds < 0) return '0s';
   const d = Math.floor(seconds / 86400);
