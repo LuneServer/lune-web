@@ -59,7 +59,14 @@ export function enterFullscreen(container: HTMLElement | null, video: HTMLVideoE
   const v = video as WebkitFullscreenVideo | null;
   try {
     if (el && typeof el.requestFullscreen === 'function') {
-      el.requestFullscreen().then(lockLandscape, () => {});
+      el.requestFullscreen().then(lockLandscape, () => {
+        // Container fullscreen refused: fall back to the native video player where available.
+        try {
+          v?.webkitEnterFullscreen?.();
+        } catch {
+          // ignore
+        }
+      });
       return;
     }
     if (el && typeof el.webkitRequestFullscreen === 'function') {
