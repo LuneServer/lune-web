@@ -1,4 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import {
+  enterFullscreen,
+  exitAnyFullscreen,
+  getFullscreenElement,
+  isNativeVideoFullscreen,
+  unlockOrientation,
+} from '../lib/fullscreen';
 import Hls from 'hls.js';
 import {
   ArrowLeft,
@@ -181,6 +188,7 @@ export function TheaterPlayer({
   const [playbackRate, setPlaybackRate] = useState(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isPiP, setIsPiP] = useState(false);
+  const [isNativeFs, setIsNativeFs] = useState(false);
   const [stageSize, setStageSize] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
   const pipTrackRef = useRef<TextTrack | null>(null);
   const [scrubPreviewSec, setScrubPreviewSec] = useState<number | null>(null);
@@ -841,8 +849,8 @@ export function TheaterPlayer({
       }
       window.removeEventListener('pagehide', handleUnload);
       window.removeEventListener('beforeunload', handleUnload);
-      if (document.fullscreenElement) {
-        document.exitFullscreen().catch(() => {});
+      if (getFullscreenElement()) {
+        exitAnyFullscreen(null);
       }
       if (subAbortRef.current) {
         subAbortRef.current.abort();
@@ -1023,9 +1031,30 @@ export function TheaterPlayer({
 
   // Track fullscreen & Picture-in-Picture changes
   useEffect(() => {
-    const onFsChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
+    const video = videoRef.current;
+    const onFsChange = () => {
+      const on = Boolean(getFullscreenElement());
+      setIsFullscreen(on || isNativeVideoFullscreen(videoRef.current));
+      if (!on) unlockOrientation();
+    };
+    const onNativeBegin = () => {
+      setIsNativeFs(true);
+      setIsFullscreen(true);
+    };
+    const onNativeEnd = () => {
+      setIsNativeFs(false);
+      setIsFullscreen(Boolean(getFullscreenElement()));
+    };
     document.addEventListener('fullscreenchange', onFsChange);
-    return () => document.removeEventListener('fullscreenchange', onFsChange);
+    document.addEventListener('webkitfullscreenchange', onFsChange);
+    video?.addEventListener('webkitbeginfullscreen', onNativeBegin);
+    video?.addEventListener('webkitendfullscreen', onNativeEnd);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFsChange);
+      document.removeEventListener('webkitfullscreenchange', onFsChange);
+      video?.removeEventListener('webkitbeginfullscreen', onNativeBegin);
+      video?.removeEventListener('webkitendfullscreen', onNativeEnd);
+    };
   }, []);
 
   // Track video stage dimensions so subtitles stay cleanly inside the active picture (above letterbox bars)
@@ -1063,12 +1092,13 @@ export function TheaterPlayer({
     };
   }, []);
 
-  // Mirror parsed subtitle cues into a native TextTrack ONLY while in Picture-in-Picture,
-  // keeping normal and fullscreen playback 100% driven by Lune's custom styled overlay.
+  // Mirror parsed subtitle cues into a native TextTrack ONLY while in Picture-in-Picture or iOS native
+  // video fullscreen (where DOM overlays are not rendered), keeping all other playback driven by
+  // Lune's custom styled overlay.
   useEffect(() => {
     const video = videoRef.current;
     if (!video || typeof VTTCue === 'undefined') return;
-    if (!isPiP || selectedSubIdx === null || subCues.length === 0) {
+    if (!(isPiP || isNativeFs) || selectedSubIdx === null || subCues.length === 0) {
       if (pipTrackRef.current) {
         pipTrackRef.current.mode = 'hidden';
       }
@@ -1093,7 +1123,7 @@ export function TheaterPlayer({
       }
     }
     track.mode = 'showing';
-  }, [isPiP, selectedSubIdx, selectedSubTrack?.language, subCues, subOffsetSec, streamOffsetSec]);
+  }, [isPiP, isNativeFs, selectedSubIdx, selectedSubTrack?.language, subCues, subOffsetSec, streamOffsetSec]);
 
   // Auto-hide OSD on idle while playing
   const wakeOSD = useCallback(() => {
@@ -1220,12 +1250,11 @@ export function TheaterPlayer({
   }, [muted, wakeOSD]);
 
   const toggleFullscreen = useCallback(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    if (!document.fullscreenElement) {
-      el.requestFullscreen().catch(() => {});
+    const video = videoRef.current;
+    if (getFullscreenElement() || isNativeVideoFullscreen(video)) {
+      exitAnyFullscreen(video);
     } else {
-      document.exitFullscreen().catch(() => {});
+      enterFullscreen(containerRef.current, video);
     }
   }, []);
 
@@ -1426,7 +1455,7 @@ export function TheaterPlayer({
         case 'Escape':
           if (openMenu !== 'none') {
             setOpenMenu('none');
-          } else if (!document.fullscreenElement) {
+          } else if (!getFullscreenElement()) {
             onClose();
           }
           break;
