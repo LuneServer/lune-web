@@ -109,7 +109,7 @@ export interface MaintenanceRunReport {
   started_at: string;
   finished_at: string;
   duration_ms: number;
-  trigger: 'scheduled' | 'manual' | 'resume' | string;
+  trigger: 'scheduled' | 'manual' | 'resume' | 'new_media' | string;
   task?: MaintenanceTask | string;
   canceled?: boolean;
   skipped_artwork_scan_busy?: boolean;
@@ -155,6 +155,8 @@ export interface MaintenanceStatus {
   server_timezone?: string;
   /** True while chapter still generation is paused and will resume once playback/scans end. */
   chapters_resume_pending?: boolean;
+  /** True while a chapter stills / trickplay pass for newly scanned media waits for the server to be idle. */
+  new_media_pending?: boolean;
 }
 
 export interface HealthStatus {
