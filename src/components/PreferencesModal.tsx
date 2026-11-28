@@ -5,11 +5,14 @@ import {
   api,
   ApiError,
   type PosterBadge,
+  type SubtitleStyle,
   type TOTPSetupResponse,
   type AutoSkipMode,
   type UserPreferences,
 } from '../lib/api';
 import { POSTER_BADGE_OPTIONS } from '../lib/posterBadges';
+import { resolveSubtitleStyle } from '../lib/subtitleStyle';
+import { SubtitleStyleControls } from './SubtitleStyleControls';
 import { useBodyScrollLock } from '../lib/useBodyScrollLock';
 import { AUTO_SKIP_DEFAULTS, SKIP_COUNTDOWN_SECONDS, normalizeAutoSkip } from '../lib/skipSegments';
 import { ThemeSwitcher } from './ThemeSwitcher';
@@ -55,6 +58,8 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
   const [autoSkipCredits, setAutoSkipCredits] = useState<AutoSkipMode>(
     normalizeAutoSkip(initialPrefs?.auto_skip_credits, AUTO_SKIP_DEFAULTS.credits),
   );
+  const [subStyle, setSubStyle] = useState<SubtitleStyle>(() => resolveSubtitleStyle(initialPrefs?.subtitle_style));
+  const subStyleTouchedRef = useRef(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -100,6 +105,7 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
         setAutoSkipIntro(normalizeAutoSkip(profile.preferences.auto_skip_intro, AUTO_SKIP_DEFAULTS.intro));
         setAutoSkipRecap(normalizeAutoSkip(profile.preferences.auto_skip_recap, AUTO_SKIP_DEFAULTS.recap));
         setAutoSkipCredits(normalizeAutoSkip(profile.preferences.auto_skip_credits, AUTO_SKIP_DEFAULTS.credits));
+        if (!subStyleTouchedRef.current) setSubStyle(resolveSubtitleStyle(profile.preferences.subtitle_style));
         setTotpEnabled(Boolean(profile.totp_enabled));
         setTotpRequired(Boolean(profile.totp_required));
       })
@@ -174,6 +180,7 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
         auto_skip_intro: autoSkipIntro,
         auto_skip_recap: autoSkipRecap,
         auto_skip_credits: autoSkipCredits,
+        subtitle_style: subStyle,
       };
       const updated = await api.updateUserProfile({
         display_name: name.trim() || displayName,
@@ -337,6 +344,26 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
                 className="accent-accent w-4 h-4 shrink-0"
               />
             </label>
+
+            <div className="pt-2.5 border-t border-tone/[0.06] space-y-2">
+              <div>
+                <div className="text-xs font-medium text-ink flex items-center gap-1.5">
+                  <Subtitles className="w-3.5 h-3.5 text-ink-secondary" />
+                  Subtitle Appearance
+                </div>
+                <div className="text-[11px] text-ink-muted">
+                  Synced to your account, so every Lune app uses the same style.
+                </div>
+              </div>
+              <SubtitleStyleControls
+                value={subStyle}
+                onChange={(next) => {
+                  subStyleTouchedRef.current = true;
+                  setSubStyle(next);
+                }}
+                showPreview
+              />
+            </div>
 
             <label className="flex items-center justify-between gap-3 cursor-pointer">
               <div>

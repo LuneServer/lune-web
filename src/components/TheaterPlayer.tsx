@@ -39,6 +39,7 @@ import {
   type PlaybackOptions,
   type PlaybackPlan,
   type SubtitleStream,
+  type SubtitleStyle,
   type TrickplayInfo,
   type UserPreferences,
 } from '../lib/api';
@@ -54,12 +55,16 @@ import {
   skipLabel,
   type SkipState,
 } from '../lib/skipSegments';
+import { resolveSubtitleStyle, subtitleBoxClass, subtitleTextStyle } from '../lib/subtitleStyle';
+import { SubtitleStyleControls } from './SubtitleStyleControls';
 
 interface Props {
   itemId: string;
   initialItem?: MediaItemSummary;
   launchOptions?: PlaybackLaunchOptions;
   userPreferences?: UserPreferences;
+  /** Called after the player saves a preference (e.g. subtitle style) to the server. */
+  onPreferencesSaved?: (prefs: UserPreferences) => void;
   onClose: () => void;
   onSelectItem: (next: MediaItemSummary) => void;
   onProgressUpdated: () => void;
@@ -112,7 +117,6 @@ const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
 const LS_VOLUME = 'lune_player_volume';
 const LS_MUTED = 'lune_player_muted';
-const LS_SUB_SIZE = 'lune_player_sub_size';
 
 function readStoredVolume(): number {
   try {
@@ -135,21 +139,12 @@ function readStoredMuted(): boolean {
   }
 }
 
-function readStoredSubSize(): 'sm' | 'md' | 'lg' {
-  try {
-    const raw = localStorage.getItem(LS_SUB_SIZE);
-    if (raw === 'sm' || raw === 'md' || raw === 'lg') return raw;
-  } catch {
-    // ignore
-  }
-  return 'md';
-}
-
 export function TheaterPlayer({
   itemId,
   initialItem,
   launchOptions,
   userPreferences,
+  onPreferencesSaved,
   onClose,
   onSelectItem,
   onProgressUpdated,
@@ -218,7 +213,9 @@ export function TheaterPlayer({
   const activeCueText = activeSubs.text;
   const [subStatus, setSubStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [subRetryNonce, setSubRetryNonce] = useState(0);
-  const [subSize, setSubSize] = useState<'sm' | 'md' | 'lg'>(readStoredSubSize);
+  const [subStyle, setSubStyle] = useState<SubtitleStyle>(() => resolveSubtitleStyle(userPreferences?.subtitle_style));
+  const subStyleSaveTimerRef = useRef<number | null>(null);
+  const pendingSubStyleRef = useRef<SubtitleStyle | null>(null);
   const [subOffsetSec, setSubOffsetSec] = useState(0);
   const subTrackKeyRef = useRef<string>('');
   const subStreamStartRef = useRef<number>(0);
@@ -244,6 +241,27 @@ export function TheaterPlayer({
   upNextDismissedRef.current = upNextDismissed;
   onProgressUpdatedRef.current = onProgressUpdated;
   userPreferencesRef.current = userPreferences;
+  const onPreferencesSavedRef = useRef(onPreferencesSaved);
+  onPreferencesSavedRef.current = onPreferencesSaved;
+
+  const flushSubStyle = useCallback(() => {
+    if (subStyleSaveTimerRef.current !== null) {
+      window.clearTimeout(subStyleSaveTimerRef.current);
+      subStyleSaveTimerRef.current = null;
+    }
+    const next = pendingSubStyleRef.current;
+    const base = userPreferencesRef.current;
+    pendingSubStyleRef.current = null;
+    if (!next || !base) return;
+    api
+      .updateUserProfile({ preferences: { ...base, subtitle_style: next } })
+      .then((profile) => onPreferencesSavedRef.current?.(profile.preferences))
+      .catch(() => {
+        // Keep the local choice for this session; the next change retries the save.
+      });
+  }, []);
+  // Don't lose a style change made just before closing the player.
+  useEffect(() => flushSubStyle, [flushSubStyle]);
 
   // For HLS remux/transcode sessions started at -ss, FFmpeg outputs timestamps starting at 0.
   // Adding streamOffsetSec converts local <video>.currentTime to true absolute media position.
@@ -1617,13 +1635,13 @@ export function TheaterPlayer({
     if (videoRef.current) videoRef.current.playbackRate = rate;
   }
 
-  function handleSubSizeChange(sz: 'sm' | 'md' | 'lg') {
-    setSubSize(sz);
-    try {
-      localStorage.setItem(LS_SUB_SIZE, sz);
-    } catch {
-      // ignore
-    }
+  // Subtitle appearance is synced to the user's server preferences so it follows them across
+  // devices. Apply locally at once, then save after a short pause so rapid taps make one request.
+  function handleSubStyleChange(next: SubtitleStyle) {
+    setSubStyle(next);
+    pendingSubStyleRef.current = next;
+    if (subStyleSaveTimerRef.current !== null) window.clearTimeout(subStyleSaveTimerRef.current);
+    subStyleSaveTimerRef.current = window.setTimeout(flushSubStyle, 600);
   }
 
   // Dual-audio quick Sub / Dub toggle detection (Japanese + English audio tracks)
@@ -1800,8 +1818,6 @@ export function TheaterPlayer({
     ? `${epPrefix}${activeItem.title}${activeItem.year && !activeItem.series_title ? ` (${activeItem.year})` : ''}`
     : 'Loading…';
 
-  const subSizeClass =
-    subSize === 'sm' ? 'text-base sm:text-lg' : subSize === 'lg' ? 'text-2xl sm:text-3xl' : 'text-lg sm:text-2xl';
 
   // Rendered picture rectangle inside the stage, used to place positioned (sign) cues on the frame.
   const videoRect = useMemo(() => {
@@ -1934,12 +1950,12 @@ export function TheaterPlayer({
             {activeSubs.placed.map((c, i) => (
               <div
                 key={`${i}:${c.line}:${c.position}`}
-                className={`absolute ${subSizeClass} font-medium text-ink text-center whitespace-pre-line px-4 py-1.5 rounded-lg bg-canvas/75 backdrop-blur-xs shadow-lg w-max max-w-[min(48rem,90%)] leading-snug`}
+                className={`absolute ${subtitleBoxClass(subStyle, 'w-max max-w-[min(48rem,90%)]')}`}
                 style={{
+                  ...subtitleTextStyle(subStyle),
                   left: `${c.position}%`,
                   top: `${c.line}%`,
                   transform: `translate(-${c.position}%, -${c.line}%)`,
-                  textShadow: '0 2px 6px rgba(0,0,0,0.9)',
                 }}
               >
                 {renderFormattedSubtitle(c.text)}
@@ -1954,10 +1970,7 @@ export function TheaterPlayer({
             style={{ bottom: `${subtitleBottomPx}px` }}
             className="absolute inset-x-6 pointer-events-none flex justify-center transition-[bottom] duration-200"
           >
-            <div
-              className={`${subSizeClass} font-medium text-ink text-center whitespace-pre-line px-4 py-1.5 rounded-lg bg-canvas/75 backdrop-blur-xs shadow-lg max-w-3xl leading-snug`}
-              style={{ textShadow: '0 2px 6px rgba(0,0,0,0.9)' }}
-            >
+            <div className={subtitleBoxClass(subStyle)} style={subtitleTextStyle(subStyle)}>
               {renderFormattedSubtitle(activeCueText)}
             </div>
           </div>
@@ -2543,27 +2556,9 @@ export function TheaterPlayer({
                       )}
                     </div>
 
-                    {/* Subtitle Size */}
+                    {/* Subtitle Appearance (synced to user preferences) */}
                     <div className="pt-3 border-t border-white/[0.08]">
-                      <div className="text-[10px] font-semibold uppercase tracking-widest text-ink-secondary mb-2">
-                        Text Size
-                      </div>
-                      <div className="grid grid-cols-3 gap-1.5">
-                        {(['sm', 'md', 'lg'] as const).map((sz) => (
-                          <button
-                            key={sz}
-                            type="button"
-                            onClick={() => handleSubSizeChange(sz)}
-                            className={`py-1.5 rounded-lg text-xs font-medium cursor-pointer ${
-                              subSize === sz
-                                ? 'bg-accent text-on-accent'
-                                : 'bg-surface text-ink-secondary hover:text-ink'
-                            }`}
-                          >
-                            {sz === 'sm' ? 'Small' : sz === 'md' ? 'Medium' : 'Large'}
-                          </button>
-                        ))}
-                      </div>
+                      <SubtitleStyleControls value={subStyle} onChange={handleSubStyleChange} compact />
                     </div>
 
                     {/* Subtitle Sync Offset */}
