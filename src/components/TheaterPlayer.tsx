@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   enterFullscreen,
   exitAnyFullscreen,
@@ -78,12 +78,26 @@ interface Cue {
   line?: number;
   /** WebVTT `position:` percentage; defaults to centred when only `line` is set. */
   position?: number;
+  /** Which edge of the box sits on `line` (WebVTT `line:N%,start|center|end`). */
+  lineAlign?: CueAnchor;
+  /** Which edge of the box sits on `position` (`position:N%,line-left|center|line-right`). */
+  positionAlign?: CueAnchor;
+  /** WebVTT `align:` text alignment inside the box. */
+  textAlign?: 'left' | 'center' | 'right';
 }
+
+/** Box edge on the cue point: 0 = start/left, 0.5 = centre, 1 = end/right. */
+type CueAnchor = 0 | 0.5 | 1;
 
 interface PlacedCue {
   text: string;
   line: number;
   position: number;
+  lineAlign: CueAnchor;
+  positionAlign: CueAnchor;
+  textAlign: 'left' | 'center' | 'right';
+  /** Cues with a `position` setting are typeset ASS signs (drawn boxless with an outline). */
+  sign: boolean;
 }
 
 interface ActiveSubtitles {
@@ -1948,18 +1962,13 @@ export function TheaterPlayer({
             style={{ left: videoRect.left, top: videoRect.top, width: videoRect.width, height: videoRect.height }}
           >
             {activeSubs.placed.map((c, i) => (
-              <div
+              <PlacedCueBox
                 key={`${i}:${c.line}:${c.position}`}
-                className={`absolute ${subtitleBoxClass(subStyle, 'w-max max-w-[min(48rem,90%)]')}`}
-                style={{
-                  ...subtitleTextStyle(subStyle),
-                  left: `${c.position}%`,
-                  top: `${c.line}%`,
-                  transform: `translate(-${c.position}%, -${c.line}%)`,
-                }}
-              >
-                {renderFormattedSubtitle(c.text)}
-              </div>
+                cue={c}
+                frameWidth={videoRect.width}
+                frameHeight={videoRect.height}
+                subStyle={subStyle}
+              />
             ))}
           </div>
         )}
@@ -2837,6 +2846,67 @@ function trickplayTileIndex(tp: TrickplayInfo, ms: number): number {
   return Math.min(tp.thumb_count - 1, Math.max(0, Math.floor(ms / tp.interval_ms)));
 }
 
+/**
+ * One positioned cue inside the picture. The box's anchored edge (start / centre / end) sits on
+ * the cue's `line` / `position` point, as the server's ASS converter and the Apple TV player place
+ * typeset signs, then the box is clamped so it never leaves the frame. Signs (cues with a
+ * `position`) draw boxless with an outline in the user's size and colour; top-aligned dialogue
+ * (`line` only) keeps the full subtitle style.
+ */
+function PlacedCueBox({
+  cue,
+  frameWidth,
+  frameHeight,
+  subStyle,
+}: {
+  cue: PlacedCue;
+  frameWidth: number;
+  frameHeight: number;
+  subStyle: SubtitleStyle;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState<{ w: number; h: number } | null>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const measure = () => {
+      const w = el.offsetWidth;
+      const h = el.offsetHeight;
+      setSize((prev) => (prev && prev.w === w && prev.h === h ? prev : { w, h }));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const style = cue.sign ? { ...subStyle, background: false, outline: true } : subStyle;
+  let placement: React.CSSProperties;
+  if (size) {
+    const clamp = (v: number, max: number) => Math.max(0, Math.min(v, Math.max(0, max)));
+    placement = {
+      left: clamp((cue.position / 100) * frameWidth - cue.positionAlign * size.w, frameWidth - size.w),
+      top: clamp((cue.line / 100) * frameHeight - cue.lineAlign * size.h, frameHeight - size.h),
+    };
+  } else {
+    // Before the first measurement: translating by the box's own percentage keeps it in frame.
+    placement = {
+      left: `${cue.position}%`,
+      top: `${cue.line}%`,
+      transform: `translate(-${cue.position}%, -${cue.line}%)`,
+    };
+  }
+  return (
+    <div
+      ref={ref}
+      className={`absolute ${subtitleBoxClass(style, 'w-max max-w-[min(48rem,90%)]')}`}
+      style={{ ...subtitleTextStyle(style), ...placement, textAlign: cue.textAlign }}
+    >
+      {renderFormattedSubtitle(cue.text)}
+    </div>
+  );
+}
+
 function resolveActiveSubtitles(cues: Cue[], absSec: number, offsetSec: number): ActiveSubtitles {
   const t = absSec - offsetSec;
   let text = '';
@@ -2847,12 +2917,20 @@ function resolveActiveSubtitles(cues: Cue[], absSec: number, offsetSec: number):
       if (c.line === undefined && c.position === undefined) {
         text = text ? `${text}\n${c.text}` : c.text;
       } else {
-        placed.push({ text: c.text, line: c.line ?? 90, position: c.position ?? 50 });
+        placed.push({
+          text: c.text,
+          line: c.line ?? 90,
+          position: c.position ?? 50,
+          lineAlign: c.lineAlign ?? 0.5,
+          positionAlign: c.positionAlign ?? 0.5,
+          textAlign: c.textAlign ?? 'center',
+          sign: c.position !== undefined,
+        });
       }
     }
   }
   if (!text && placed.length === 0) return NO_ACTIVE_SUBS;
-  const key = `${text}\u0000${placed.map((p) => `${p.line},${p.position},${p.text}`).join('\u0000')}`;
+  const key = `${text}\u0000${placed.map((p) => `${p.line},${p.lineAlign},${p.position},${p.positionAlign},${p.text}`).join('\u0000')}`;
   return { key, text, placed };
 }
 
@@ -2862,6 +2940,30 @@ function parseCueSettingPct(settings: string, name: 'line' | 'position'): number
   if (!m) return undefined;
   const v = Number(m[1]);
   return Number.isFinite(v) ? Math.min(100, Math.max(0, v)) : undefined;
+}
+
+/** Reads the alignment keyword after a WebVTT `line:N%,…` / `position:N%,…` cue setting. */
+function parseCueSettingAnchor(settings: string, name: 'line' | 'position'): CueAnchor | undefined {
+  const m = settings.match(new RegExp(`(?:^|\\s)${name}:-?[\\d.]+%,([a-z-]+)`));
+  switch (m?.[1]) {
+    case 'start':
+    case 'line-left':
+      return 0;
+    case 'end':
+    case 'line-right':
+      return 1;
+    case 'center':
+      return 0.5;
+    default:
+      return undefined;
+  }
+}
+
+function parseCueTextAlign(settings: string): Cue['textAlign'] {
+  const m = settings.match(/(?:^|\s)align:([a-z]+)/);
+  if (m?.[1] === 'left' || m?.[1] === 'start') return 'left';
+  if (m?.[1] === 'right' || m?.[1] === 'end') return 'right';
+  return m ? 'center' : undefined;
 }
 
 function parseWebVTT(vtt: string): Cue[] {
@@ -2889,7 +2991,20 @@ function parseWebVTT(vtt: string): Cue[] {
         .replace(/<(?!\/?(?:i|b|u)\b)[^>]+>/gi, ''),
     );
     if (text && Number.isFinite(start) && Number.isFinite(end)) {
-      cues.push(line === undefined && position === undefined ? { start, end, text } : { start, end, text, line, position });
+      cues.push(
+        line === undefined && position === undefined
+          ? { start, end, text }
+          : {
+              start,
+              end,
+              text,
+              line,
+              position,
+              lineAlign: parseCueSettingAnchor(settings, 'line'),
+              positionAlign: parseCueSettingAnchor(settings, 'position'),
+              textAlign: parseCueTextAlign(settings),
+            },
+      );
     }
   }
   return cues;
