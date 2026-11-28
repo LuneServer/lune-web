@@ -2346,6 +2346,9 @@ export function App() {
           initialItem={view.initialItem ?? viewCache.getItemDetail(view.itemId) ?? undefined}
           launchOptions={view.launchOptions}
           userPreferences={user.preferences}
+          onPreferencesSaved={(preferences) =>
+            setUser((prev) => (prev ? { ...prev, preferences } : prev))
+          }
           onClose={() => {
             setDetailRefreshKey((k) => k + 1);
             goBack({ kind: 'item', itemId: view.itemId, initialItem: view.initialItem });

@@ -171,6 +171,17 @@ export interface HealthStatus {
 
 export type PosterBadge = 'resolution' | 'hdr' | 'dual_audio' | 'seasons' | 'rating';
 
+export type SubtitleSize = 'small' | 'medium' | 'large';
+export type SubtitleColor = 'white' | 'yellow' | 'cyan' | 'green' | 'magenta';
+
+/** Synced across clients via user preferences. */
+export interface SubtitleStyle {
+  size: SubtitleSize;
+  color: SubtitleColor;
+  background: boolean;
+  outline: boolean;
+}
+
 export interface UserPreferences {
   audio_language?: string;
   subtitle_language?: string;
@@ -186,6 +197,8 @@ export interface UserPreferences {
   auto_skip_recap?: AutoSkipMode;
   /** Episodes only: outro (credits) and preview segments. */
   auto_skip_credits?: AutoSkipMode;
+  /** Omitted until first saved; omitting it on update keeps the stored value. */
+  subtitle_style?: SubtitleStyle;
 }
 
 /** 'off' shows the Skip button only, 'countdown' skips after 5 s (cancellable), 'instant' skips at once. */
