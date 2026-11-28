@@ -137,7 +137,7 @@ export function IdentifyModal({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={kind === 'tv' ? 'Search TV or Anime title…' : 'Search movie title…'}
-              className="w-full rounded-lg bg-canvas border border-hairline pl-8 pr-3 py-2 text-xs text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+              className="w-full rounded-lg bg-canvas border border-hairline pl-8 pr-3 py-2 text-base sm:text-xs text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
             />
           </div>
           <input
@@ -145,7 +145,7 @@ export function IdentifyModal({
             value={year}
             onChange={(e) => setYear(e.target.value)}
             placeholder={initialYear ? `Year (${initialYear})` : 'Year (opt)'}
-            className="w-full sm:w-28 rounded-lg bg-canvas border border-hairline px-3 py-2 text-xs tabular-nums text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+            className="w-full sm:w-28 rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-xs tabular-nums text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
           />
           <button
             type="submit"

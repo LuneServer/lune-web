@@ -72,6 +72,7 @@ export function AuthScreen({ systemInfo, inviteToken, onClearInvite, onAuthentic
               password,
               totp_code: totpRequired ? totpCode.trim() : undefined,
             });
+      (document.activeElement as HTMLElement | null)?.blur();
       onAuthenticated(res.user);
     } catch (err) {
       if (err instanceof ApiError && err.totpRequired) {
@@ -143,8 +144,8 @@ export function AuthScreen({ systemInfo, inviteToken, onClearInvite, onAuthentic
                   autoComplete="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="dan"
-                  className="w-full rounded-lg bg-canvas border border-hairline px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50 transition-colors"
+                  placeholder="username"
+                  className="w-full rounded-lg bg-canvas border border-hairline px-3.5 py-2.5 text-base sm:text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50 transition-colors"
                 />
               </div>
 
@@ -156,7 +157,7 @@ export function AuthScreen({ systemInfo, inviteToken, onClearInvite, onAuthentic
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="Optional"
-                    className="w-full rounded-lg bg-canvas border border-hairline px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50 transition-colors"
+                    className="w-full rounded-lg bg-canvas border border-hairline px-3.5 py-2.5 text-base sm:text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50 transition-colors"
                   />
                 </div>
               )}
@@ -171,7 +172,7 @@ export function AuthScreen({ systemInfo, inviteToken, onClearInvite, onAuthentic
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder={isSetup || isInvite ? 'Minimum 8 characters' : '••••••••'}
-                  className="w-full rounded-lg bg-canvas border border-hairline px-3.5 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50 transition-colors"
+                  className="w-full rounded-lg bg-canvas border border-hairline px-3.5 py-2.5 text-base sm:text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50 transition-colors"
                 />
               </div>
 
@@ -189,7 +190,7 @@ export function AuthScreen({ systemInfo, inviteToken, onClearInvite, onAuthentic
                     value={totpCode}
                     onChange={(e) => setTotpCode(e.target.value)}
                     placeholder="123456 or XXXX-XXXX"
-                    className="w-full rounded-lg bg-canvas border border-tone/40 px-3.5 py-2.5 text-sm font-mono tracking-wider text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/70 transition-colors"
+                    className="w-full rounded-lg bg-canvas border border-tone/40 px-3.5 py-2.5 text-base sm:text-sm font-mono tracking-wider text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/70 transition-colors"
                   />
                   <p className="text-[11px] text-ink-muted mt-1">
                     Enter the 6-digit code from your authenticator app or a one-time recovery code.

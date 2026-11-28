@@ -212,14 +212,14 @@ export function ConsoleUsers({ currentUserId, users, libraries, onChanged }: Pro
               placeholder="Username"
               value={newUsername}
               onChange={(e) => setNewUsername(e.target.value)}
-              className="md:col-span-3 rounded-lg bg-canvas border border-hairline px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+              className="md:col-span-3 rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
             />
             <input
               type="text"
               placeholder="Display name"
               value={newDisplay}
               onChange={(e) => setNewDisplay(e.target.value)}
-              className="md:col-span-2 rounded-lg bg-canvas border border-hairline px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+              className="md:col-span-2 rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
             />
             <input
               type="password"
@@ -228,12 +228,12 @@ export function ConsoleUsers({ currentUserId, users, libraries, onChanged }: Pro
               placeholder="Password (min 8)"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="md:col-span-3 rounded-lg bg-canvas border border-hairline px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+              className="md:col-span-3 rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
             />
             <select
               value={newRole}
               onChange={(e) => setNewRole(e.target.value as 'member' | 'admin')}
-              className="md:col-span-2 rounded-lg bg-canvas border border-hairline px-3 py-2 text-sm text-ink focus:outline-none focus:border-tone/50"
+              className="md:col-span-2 rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-sm text-ink focus:outline-none focus:border-tone/50"
             >
               <option value="member">Member</option>
               <option value="admin">Admin</option>
@@ -457,7 +457,7 @@ export function ConsoleUsers({ currentUserId, users, libraries, onChanged }: Pro
                           required
                           value={editDisplay}
                           onChange={(e) => setEditDisplay(e.target.value)}
-                          className="w-full rounded-lg bg-canvas border border-hairline px-3 py-1.5 text-xs text-ink focus:outline-none focus:border-tone/50"
+                          className="w-full rounded-lg bg-canvas border border-hairline px-3 py-1.5 text-base sm:text-xs text-ink focus:outline-none focus:border-tone/50"
                         />
                       </div>
                       <div>
@@ -466,7 +466,7 @@ export function ConsoleUsers({ currentUserId, users, libraries, onChanged }: Pro
                           disabled={isSelf}
                           value={editRole}
                           onChange={(e) => setEditRole(e.target.value as 'member' | 'admin')}
-                          className="w-full rounded-lg bg-canvas border border-hairline disabled:opacity-60 px-3 py-1.5 text-xs text-ink focus:outline-none focus:border-tone/50"
+                          className="w-full rounded-lg bg-canvas border border-hairline disabled:opacity-60 px-3 py-1.5 text-base sm:text-xs text-ink focus:outline-none focus:border-tone/50"
                         >
                           <option value="member">Member</option>
                           <option value="admin">Admin</option>
@@ -620,7 +620,7 @@ export function ConsoleUsers({ currentUserId, users, libraries, onChanged }: Pro
                       value={resetPassword}
                       onChange={(e) => setResetPassword(e.target.value)}
                       placeholder="New password (min 8 chars)"
-                      className="flex-1 max-w-xs rounded-lg bg-canvas border border-hairline px-3 py-1.5 text-xs text-ink focus:outline-none focus:border-tone/50"
+                      className="flex-1 max-w-xs rounded-lg bg-canvas border border-hairline px-3 py-1.5 text-base sm:text-xs text-ink focus:outline-none focus:border-tone/50"
                     />
                     <button
                       type="submit"

@@ -337,7 +337,7 @@ export function ConsoleNetwork({ onNetworkConfigChange }: Props) {
                   value={cfg.domain}
                   onChange={(e) => updateField('domain', e.target.value)}
                   placeholder="lune.example.com"
-                  className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+                  className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
                 />
               </div>
 
@@ -354,7 +354,7 @@ export function ConsoleNetwork({ onNetworkConfigChange }: Props) {
                   value={cfg.acme_email}
                   onChange={(e) => updateField('acme_email', e.target.value)}
                   placeholder="admin@example.com"
-                  className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-xs text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+                  className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-xs text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
                 />
                 <p className="text-[11px] text-ink-muted mt-1">
                   Used by Let&apos;s Encrypt for certificate renewal notices.
@@ -376,7 +376,7 @@ export function ConsoleNetwork({ onNetworkConfigChange }: Props) {
                   onChange={(e) =>
                     updateField('acme_dns_provider', e.target.value as '' | 'cloudflare')
                   }
-                  className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-xs text-ink focus:outline-none focus:border-tone/50"
+                  className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-xs text-ink focus:outline-none focus:border-tone/50"
                 >
                   <option value="">HTTP-01 / ALPN-01 (default)</option>
                   <option value="cloudflare">Cloudflare DNS-01 (no port 80 needed)</option>
@@ -400,7 +400,7 @@ export function ConsoleNetwork({ onNetworkConfigChange }: Props) {
                     placeholder={
                       cfg.has_cf_api_token ? 'Saved (leave blank to keep)' : 'Zone:DNS:Edit token'
                     }
-                    className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+                    className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
                   />
                 </div>
               )}
@@ -453,7 +453,7 @@ export function ConsoleNetwork({ onNetworkConfigChange }: Props) {
                   value={cfg.public_url}
                   onChange={(e) => updateField('public_url', e.target.value)}
                   placeholder="https://lune.example.com"
-                  className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+                  className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
                 />
                 <p className="text-[11px] text-ink-muted mt-1">
                   Used for invite links and secure cookie settings when served over HTTPS.
@@ -473,7 +473,7 @@ export function ConsoleNetwork({ onNetworkConfigChange }: Props) {
                   value={cfg.trusted_proxies}
                   onChange={(e) => updateField('trusted_proxies', e.target.value)}
                   placeholder="10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16"
-                  className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+                  className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
                 />
                 <p className="text-[11px] text-ink-muted mt-1">
                   Leave blank to trust standard Docker/LAN subnets (
@@ -509,7 +509,7 @@ export function ConsoleNetwork({ onNetworkConfigChange }: Props) {
                 value={cfg.public_url}
                 onChange={(e) => updateField('public_url', e.target.value)}
                 placeholder="https://lune.your-tailnet.ts.net"
-                className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+                className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
               />
               <p className="text-[11px] text-ink-muted mt-1">
                 Used for invite links and secure cookies across your tailnet.
@@ -596,7 +596,7 @@ export function ConsoleNetwork({ onNetworkConfigChange }: Props) {
                 value={cfg.ip_allowlist ?? ''}
                 onChange={(e) => updateField('ip_allowlist', e.target.value)}
                 placeholder="203.0.113.5, 198.51.100.0/24"
-                className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+                className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
               />
               <p className="text-[11px] text-ink-muted mt-1">
                 Never rate-limited or auto-banned; also permitted when LAN-only Admin Console is on.
@@ -616,7 +616,7 @@ export function ConsoleNetwork({ onNetworkConfigChange }: Props) {
                 value={cfg.ip_blocklist ?? ''}
                 onChange={(e) => updateField('ip_blocklist', e.target.value)}
                 placeholder="192.0.2.0/24"
-                className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+                className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
               />
               <p className="text-[11px] text-ink-muted mt-1">
                 Immediately rejected with HTTP 403 at the edge.
@@ -680,19 +680,19 @@ export function ConsoleNetwork({ onNetworkConfigChange }: Props) {
             value={banIP}
             onChange={(e) => setBanIP(e.target.value)}
             placeholder="IP address (e.g. 203.0.113.42)"
-            className="sm:col-span-4 rounded-lg bg-canvas border border-hairline px-3 py-2 text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+            className="sm:col-span-4 rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
           />
           <input
             type="text"
             value={banReason}
             onChange={(e) => setBanReason(e.target.value)}
             placeholder="Reason (optional)"
-            className="sm:col-span-4 rounded-lg bg-canvas border border-hairline px-3 py-2 text-xs text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+            className="sm:col-span-4 rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-xs text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
           />
           <select
             value={banMinutes}
             onChange={(e) => setBanMinutes(e.target.value)}
-            className="sm:col-span-2 rounded-lg bg-canvas border border-hairline px-2.5 py-2 text-xs text-ink focus:outline-none focus:border-tone/50"
+            className="sm:col-span-2 rounded-lg bg-canvas border border-hairline px-2.5 py-2 text-base sm:text-xs text-ink focus:outline-none focus:border-tone/50"
           >
             <option value="15">15 min</option>
             <option value="60">1 hour</option>

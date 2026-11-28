@@ -346,7 +346,7 @@ export function ConsolePlayback() {
                     clearFeedback();
                   }}
                   aria-label="Maximum server-wide concurrent transcodes"
-                  className="w-20 rounded-lg bg-canvas border border-hairline px-2.5 py-1.5 text-xs tabular-nums text-ink focus:outline-none focus:border-tone/50"
+                  className="w-20 rounded-lg bg-canvas border border-hairline px-2.5 py-1.5 text-base sm:text-xs tabular-nums text-ink focus:outline-none focus:border-tone/50"
                 />
               )}
             </div>
@@ -420,7 +420,7 @@ export function ConsolePlayback() {
                     clearFeedback();
                   }}
                   aria-label="Maximum per-user concurrent transcodes"
-                  className="w-20 rounded-lg bg-canvas border border-hairline px-2.5 py-1.5 text-xs tabular-nums text-ink focus:outline-none focus:border-tone/50"
+                  className="w-20 rounded-lg bg-canvas border border-hairline px-2.5 py-1.5 text-base sm:text-xs tabular-nums text-ink focus:outline-none focus:border-tone/50"
                 />
               )}
             </div>
@@ -455,7 +455,7 @@ export function ConsolePlayback() {
                   setIdleTimeoutInput(e.target.value);
                   clearFeedback();
                 }}
-                className="w-20 rounded-lg bg-canvas border border-hairline px-2.5 py-1.5 text-xs tabular-nums text-ink focus:outline-none focus:border-tone/50"
+                className="w-20 rounded-lg bg-canvas border border-hairline px-2.5 py-1.5 text-base sm:text-xs tabular-nums text-ink focus:outline-none focus:border-tone/50"
               />
               <span className="text-xs text-ink-muted tabular-nums">min</span>
             </div>

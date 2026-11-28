@@ -60,7 +60,7 @@ export function ConsoleActivity({ events }: Props) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Filter events or IP…"
-            className="w-52 rounded-lg bg-canvas border border-hairline pl-8 pr-3 py-1.5 text-xs text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+            className="w-52 rounded-lg bg-canvas border border-hairline pl-8 pr-3 py-1.5 text-base sm:text-xs text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
           />
         </div>
       </div>

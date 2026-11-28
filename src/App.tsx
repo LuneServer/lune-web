@@ -1247,7 +1247,7 @@ export function App() {
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
                     placeholder={activeLibrary ? `Search ${activeLibrary.name}…` : 'Search everything…'}
-                    className="w-44 lg:w-56 xl:w-64 rounded-full bg-surface border border-tone/10 pl-8 pr-3 py-1.5 text-xs text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/35 transition-colors"
+                    className="w-44 lg:w-56 xl:w-64 rounded-full bg-surface border border-tone/10 pl-8 pr-3 py-1.5 text-base sm:text-xs text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/35 transition-colors"
                   />
                 </div>
 
@@ -1423,7 +1423,7 @@ export function App() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={activeLibrary ? `Search ${activeLibrary.name}…` : 'Search everything…'}
-                className="w-full rounded-xl bg-surface border border-tone/12 pl-10 pr-9 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/40 transition-colors"
+                className="w-full rounded-xl bg-surface border border-tone/12 pl-10 pr-9 py-2 text-base sm:text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/40 transition-colors"
               />
               {search && (
                 <button
@@ -2064,7 +2064,7 @@ export function App() {
                   <select
                     value={sort}
                     onChange={(e) => setSort(e.target.value as SortOption)}
-                    className="rounded-lg bg-surface border border-hairline px-3 py-1.5 text-xs text-ink focus:outline-none focus:border-tone/50"
+                    className="rounded-lg bg-surface border border-hairline px-3 py-1.5 text-base sm:text-xs text-ink focus:outline-none focus:border-tone/50"
                   >
                     <option value="title">Title (A–Z)</option>
                     <option value="recent">Recently Added</option>
@@ -2210,7 +2210,7 @@ export function App() {
                   <select
                     value={sort}
                     onChange={(e) => setSort(e.target.value as SortOption)}
-                    className="rounded-lg bg-surface border border-hairline px-3 py-1.5 text-xs text-ink focus:outline-none focus:border-tone/50"
+                    className="rounded-lg bg-surface border border-hairline px-3 py-1.5 text-base sm:text-xs text-ink focus:outline-none focus:border-tone/50"
                   >
                     <option value="title">Title (A–Z)</option>
                     <option value="recent">Recently Added</option>

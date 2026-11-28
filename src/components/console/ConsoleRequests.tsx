@@ -624,7 +624,7 @@ export function ConsoleRequests({
                           value={declineNote}
                           onChange={(e) => setDeclineNote(e.target.value)}
                           placeholder="Optional decline note shown to the requester…"
-                          className="flex-1 min-w-[200px] rounded-lg bg-canvas border border-hairline px-3 py-1.5 text-xs text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/40"
+                          className="flex-1 min-w-[200px] rounded-lg bg-canvas border border-hairline px-3 py-1.5 text-base sm:text-xs text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/40"
                         />
                         <button
                           type="button"
@@ -774,7 +774,7 @@ export function ConsoleRequests({
                                   ? 'http://radarr:7878'
                                   : 'http://sonarr:8989'
                               }
-                              className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+                              className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
                             />
                           </div>
 
@@ -791,7 +791,7 @@ export function ConsoleRequests({
                                   ? 'Saved (leave blank to keep)'
                                   : 'Paste API key'
                               }
-                              className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+                              className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
                             />
                           </div>
                         </div>
@@ -846,7 +846,7 @@ export function ConsoleRequests({
                                 onChange={(e) =>
                                   updateSlot(slot, { quality_profile_id: Number(e.target.value) })
                                 }
-                                className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-xs text-ink focus:outline-none focus:border-tone/50"
+                                className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-xs text-ink focus:outline-none focus:border-tone/50"
                               >
                                 <option value={0}>Select a quality profile…</option>
                                 {profiles.map((p) => (
@@ -866,7 +866,7 @@ export function ConsoleRequests({
                                   })
                                 }
                                 placeholder="Click Test & Load Profiles or enter ID"
-                                className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-xs tabular-nums text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+                                className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-xs tabular-nums text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
                               />
                             )}
                           </div>
@@ -879,7 +879,7 @@ export function ConsoleRequests({
                               <select
                                 value={inst.root_folder}
                                 onChange={(e) => updateSlot(slot, { root_folder: e.target.value })}
-                                className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-xs font-mono text-ink focus:outline-none focus:border-tone/50"
+                                className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-xs font-mono text-ink focus:outline-none focus:border-tone/50"
                               >
                                 <option value="">Select a root folder…</option>
                                 {folders.map((f) => (
@@ -897,7 +897,7 @@ export function ConsoleRequests({
                                 placeholder={
                                   service === 'radarr' ? '/movies' : '/tv'
                                 }
-                                className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+                                className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
                               />
                             )}
                           </div>
@@ -930,7 +930,7 @@ export function ConsoleRequests({
                                         anime_quality_profile_id: Number(e.target.value) || 0,
                                       })
                                     }
-                                    className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-xs text-ink focus:outline-none focus:border-tone/50"
+                                    className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-xs text-ink focus:outline-none focus:border-tone/50"
                                   >
                                     <option value={0}>Same as default quality profile</option>
                                     {profiles.map((p) => (
@@ -950,7 +950,7 @@ export function ConsoleRequests({
                                       })
                                     }
                                     placeholder="Same as default (or enter ID)"
-                                    className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-xs tabular-nums text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+                                    className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-xs tabular-nums text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
                                   />
                                 )}
                               </div>
@@ -965,7 +965,7 @@ export function ConsoleRequests({
                                     onChange={(e) =>
                                       updateSlot(slot, { anime_root_folder: e.target.value })
                                     }
-                                    className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-xs font-mono text-ink focus:outline-none focus:border-tone/50"
+                                    className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-xs font-mono text-ink focus:outline-none focus:border-tone/50"
                                   >
                                     <option value="">Same as default root folder</option>
                                     {folders.map((f) => (
@@ -983,7 +983,7 @@ export function ConsoleRequests({
                                       updateSlot(slot, { anime_root_folder: e.target.value })
                                     }
                                     placeholder="Same as default (e.g. /anime)"
-                                    className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+                                    className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
                                   />
                                 )}
                               </div>
@@ -1003,7 +1003,7 @@ export function ConsoleRequests({
                                 onChange={(e) =>
                                   updateSlot(slot, { minimum_availability: e.target.value })
                                 }
-                                className="rounded-lg bg-canvas border border-hairline px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-tone/50"
+                                className="rounded-lg bg-canvas border border-hairline px-2.5 py-1.5 text-base sm:text-xs text-ink focus:outline-none focus:border-tone/50"
                               >
                                 <option value="announced">Announced</option>
                                 <option value="inCinemas">In Cinemas</option>
@@ -1019,7 +1019,7 @@ export function ConsoleRequests({
                                   onChange={(e) =>
                                     updateSlot(slot, { series_type: e.target.value })
                                   }
-                                  className="rounded-lg bg-canvas border border-hairline px-2.5 py-1.5 text-xs text-ink focus:outline-none focus:border-tone/50"
+                                  className="rounded-lg bg-canvas border border-hairline px-2.5 py-1.5 text-base sm:text-xs text-ink focus:outline-none focus:border-tone/50"
                                 >
                                   <option value="standard">Standard</option>
                                   <option value="anime">Anime</option>

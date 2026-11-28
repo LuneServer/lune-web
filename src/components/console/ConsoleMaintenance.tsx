@@ -694,7 +694,7 @@ export function ConsoleMaintenance() {
                     setIntervalInput(e.target.value);
                     clearFeedback();
                   }}
-                  className="w-20 rounded-lg bg-canvas border border-hairline px-2.5 py-1.5 text-xs tabular-nums text-ink disabled:opacity-50 focus:outline-none focus:border-tone/50"
+                  className="w-20 rounded-lg bg-canvas border border-hairline px-2.5 py-1.5 text-base sm:text-xs tabular-nums text-ink disabled:opacity-50 focus:outline-none focus:border-tone/50"
                 />
                 <span className="text-xs text-ink-muted">hrs</span>
               </div>
@@ -763,7 +763,7 @@ export function ConsoleMaintenance() {
                       setScheduleTimeInput(e.target.value);
                       clearFeedback();
                     }}
-                    className="rounded-lg bg-canvas border border-hairline px-2.5 py-1.5 text-xs tabular-nums text-ink disabled:opacity-50 focus:outline-none focus:border-tone/50"
+                    className="rounded-lg bg-canvas border border-hairline px-2.5 py-1.5 text-base sm:text-xs tabular-nums text-ink disabled:opacity-50 focus:outline-none focus:border-tone/50"
                   />
                 )}
               </div>
@@ -801,7 +801,7 @@ export function ConsoleMaintenance() {
                         setGraceInput(e.target.value);
                         clearFeedback();
                       }}
-                      className="w-16 rounded-lg bg-canvas border border-hairline px-2 py-1.5 text-xs tabular-nums text-ink focus:outline-none focus:border-tone/50"
+                      className="w-16 rounded-lg bg-canvas border border-hairline px-2 py-1.5 text-base sm:text-xs tabular-nums text-ink focus:outline-none focus:border-tone/50"
                     />
                     <span className="text-xs text-ink-muted">hrs</span>
                   </div>
@@ -861,7 +861,7 @@ export function ConsoleMaintenance() {
                         setSubDaysInput(e.target.value);
                         clearFeedback();
                       }}
-                      className="w-16 rounded-lg bg-canvas border border-hairline px-2 py-1.5 text-xs tabular-nums text-ink focus:outline-none focus:border-tone/50"
+                      className="w-16 rounded-lg bg-canvas border border-hairline px-2 py-1.5 text-base sm:text-xs tabular-nums text-ink focus:outline-none focus:border-tone/50"
                     />
                     <span className="text-xs text-ink-muted">days</span>
                   </div>
@@ -921,7 +921,7 @@ export function ConsoleMaintenance() {
                         setAuditDaysInput(e.target.value);
                         clearFeedback();
                       }}
-                      className="w-20 rounded-lg bg-canvas border border-hairline px-2 py-1.5 text-xs tabular-nums text-ink focus:outline-none focus:border-tone/50"
+                      className="w-20 rounded-lg bg-canvas border border-hairline px-2 py-1.5 text-base sm:text-xs tabular-nums text-ink focus:outline-none focus:border-tone/50"
                     />
                     <span className="text-xs text-ink-muted">days</span>
                   </div>
@@ -1007,7 +1007,7 @@ export function ConsoleMaintenance() {
                           setCfg((prev) => ({ ...prev, trickplay_interval_seconds: Number(e.target.value) }));
                           clearFeedback();
                         }}
-                        className="rounded-lg bg-canvas border border-hairline px-2 py-1 text-xs tabular-nums text-ink focus:outline-none focus:border-tone/50"
+                        className="rounded-lg bg-canvas border border-hairline px-2 py-1 text-base sm:text-xs tabular-nums text-ink focus:outline-none focus:border-tone/50"
                       >
                         {TRICKPLAY_INTERVALS.map((sec) => (
                           <option key={sec} value={sec}>
@@ -1024,7 +1024,7 @@ export function ConsoleMaintenance() {
                           setCfg((prev) => ({ ...prev, trickplay_width: Number(e.target.value) }));
                           clearFeedback();
                         }}
-                        className="rounded-lg bg-canvas border border-hairline px-2 py-1 text-xs text-ink focus:outline-none focus:border-tone/50"
+                        className="rounded-lg bg-canvas border border-hairline px-2 py-1 text-base sm:text-xs text-ink focus:outline-none focus:border-tone/50"
                       >
                         {TRICKPLAY_WIDTHS.map((w) => (
                           <option key={w.px} value={w.px}>

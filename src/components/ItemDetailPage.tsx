@@ -1059,7 +1059,7 @@ export function ItemDetailPage({
                         <select
                           value={selectedAudioIdx ?? audioTracks[0].index}
                           onChange={(e) => setSelectedAudioIdx(Number(e.target.value))}
-                          className="appearance-none w-full h-9 rounded-lg bg-surface/70 hover:bg-surface border border-tone/12 hover:border-tone/25 pl-3 pr-8 text-xs text-ink tabular-nums truncate focus:outline-none focus:border-tone/45 transition-colors cursor-pointer"
+                          className="appearance-none w-full h-9 rounded-lg bg-surface/70 hover:bg-surface border border-tone/12 hover:border-tone/25 pl-3 pr-8 text-base sm:text-xs text-ink tabular-nums truncate focus:outline-none focus:border-tone/45 transition-colors cursor-pointer"
                         >
                           {audioTracks.map((tr) => (
                             <option key={tr.index} value={tr.index}>
@@ -1085,7 +1085,7 @@ export function ItemDetailPage({
                         onChange={(e) =>
                           setSelectedSubIdx(e.target.value === '' ? null : Number(e.target.value))
                         }
-                        className="appearance-none w-full h-9 rounded-lg bg-surface/70 hover:bg-surface border border-tone/12 hover:border-tone/25 pl-3 pr-8 text-xs text-ink tabular-nums truncate focus:outline-none focus:border-tone/45 transition-colors cursor-pointer"
+                        className="appearance-none w-full h-9 rounded-lg bg-surface/70 hover:bg-surface border border-tone/12 hover:border-tone/25 pl-3 pr-8 text-base sm:text-xs text-ink tabular-nums truncate focus:outline-none focus:border-tone/45 transition-colors cursor-pointer"
                       >
                         <option value="">Off</option>
                       {subtitleTracks.map((sub) => {
