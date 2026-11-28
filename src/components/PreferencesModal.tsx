@@ -277,7 +277,7 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
             <select
               value={audioLang}
               onChange={(e) => setAudioLang(e.target.value)}
-              className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-xs text-ink focus:outline-none focus:border-tone/50"
+              className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-xs text-ink focus:outline-none focus:border-tone/50"
             >
               {LANGUAGES.map((l) => (
                 <option key={l.code || 'auto'} value={l.code}>
@@ -295,7 +295,7 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
             <select
               value={subLang}
               onChange={(e) => setSubLang(e.target.value)}
-              className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-xs text-ink focus:outline-none focus:border-tone/50"
+              className="w-full rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-xs text-ink focus:outline-none focus:border-tone/50"
             >
               {LANGUAGES.filter((l) => l.code !== '').map((l) => (
                 <option key={l.code} value={l.code}>
@@ -586,7 +586,7 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
                   value={totpPassword}
                   onChange={(e) => setTotpPassword(e.target.value)}
                   placeholder="Current password"
-                  className="rounded-lg bg-surface border border-hairline px-2.5 py-1.5 text-xs text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+                  className="rounded-lg bg-surface border border-hairline px-2.5 py-1.5 text-base sm:text-xs text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
                 />
                 <input
                   type="text"
@@ -594,7 +594,7 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
                   value={totpCode}
                   onChange={(e) => setTotpCode(e.target.value)}
                   placeholder="6-digit code"
-                  className="rounded-lg bg-surface border border-hairline px-2.5 py-1.5 text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+                  className="rounded-lg bg-surface border border-hairline px-2.5 py-1.5 text-base sm:text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
                 />
               </div>
               <div className="flex items-center justify-end gap-2">
@@ -631,14 +631,14 @@ export function PreferencesModal({ displayName, initialPrefs, onClose, onSaved }
                   value={totpPassword}
                   onChange={(e) => setTotpPassword(e.target.value)}
                   placeholder="Current password"
-                  className="rounded-lg bg-surface border border-hairline px-2.5 py-1.5 text-xs text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+                  className="rounded-lg bg-surface border border-hairline px-2.5 py-1.5 text-base sm:text-xs text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
                 />
                 <input
                   type="text"
                   value={totpCode}
                   onChange={(e) => setTotpCode(e.target.value)}
                   placeholder="Code or XXXX-XXXX"
-                  className="rounded-lg bg-surface border border-hairline px-2.5 py-1.5 text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+                  className="rounded-lg bg-surface border border-hairline px-2.5 py-1.5 text-base sm:text-xs font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
                 />
               </div>
               <div className="flex items-center justify-end gap-2">

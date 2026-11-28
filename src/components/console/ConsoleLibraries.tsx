@@ -138,12 +138,12 @@ export function ConsoleLibraries({ libraries, onLibrariesChanged, onRefreshTelem
           }
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="md:col-span-3 rounded-lg bg-canvas border border-hairline px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+          className="md:col-span-3 rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
         />
         <select
           value={kind}
           onChange={(e) => setKind(e.target.value as Library['kind'])}
-          className="md:col-span-2 rounded-lg bg-canvas border border-hairline px-3 py-2 text-sm text-ink focus:outline-none focus:border-tone/50"
+          className="md:col-span-2 rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-sm text-ink focus:outline-none focus:border-tone/50"
         >
           <option value="movies">Movies</option>
           <option value="shows">TV Shows</option>
@@ -157,7 +157,7 @@ export function ConsoleLibraries({ libraries, onLibrariesChanged, onRefreshTelem
           placeholder={`/media/${kind}`}
           value={rootPath}
           onChange={(e) => setRootPath(e.target.value)}
-          className="md:col-span-5 rounded-lg bg-canvas border border-hairline px-3 py-2 text-sm font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+          className="md:col-span-5 rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-sm font-mono text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
         />
         <button
           type="submit"

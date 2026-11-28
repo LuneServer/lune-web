@@ -53,7 +53,7 @@ export function LibraryFilterBar({ facets, filters, onChange, onReset }: Props) 
   }
 
   const selectClass = (active: boolean) =>
-    `min-h-[34px] max-w-full rounded-lg border px-2.5 py-1.5 text-xs tabular-nums transition-colors focus:outline-none cursor-pointer ${
+    `min-h-[34px] max-w-full rounded-lg border px-2.5 py-1.5 text-base sm:text-xs tabular-nums transition-colors focus:outline-none cursor-pointer ${
       active
         ? 'bg-tone/12 border-tone/35 text-ink font-medium'
         : 'bg-surface border-hairline text-ink-secondary hover:text-ink hover:border-tone/25'

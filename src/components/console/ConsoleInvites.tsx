@@ -108,12 +108,12 @@ export function ConsoleInvites({ invites, libraries, publicUrl, onChanged }: Pro
               placeholder="Label / note (e.g. For Alex)"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
-              className="md:col-span-4 rounded-lg bg-canvas border border-hairline px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+              className="md:col-span-4 rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
             />
             <select
               value={role}
               onChange={(e) => setRole(e.target.value as 'member' | 'admin')}
-              className="md:col-span-2 rounded-lg bg-canvas border border-hairline px-3 py-2 text-sm text-ink focus:outline-none focus:border-tone/50"
+              className="md:col-span-2 rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-sm text-ink focus:outline-none focus:border-tone/50"
             >
               <option value="member">Member</option>
               <option value="admin">Admin</option>
@@ -126,13 +126,13 @@ export function ConsoleInvites({ invites, libraries, publicUrl, onChanged }: Pro
                 max={100}
                 value={maxUses}
                 onChange={(e) => setMaxUses(Number(e.target.value) || 1)}
-                className="w-full bg-transparent text-sm tabular-nums text-ink focus:outline-none"
+                className="w-full bg-transparent text-base sm:text-sm tabular-nums text-ink focus:outline-none"
               />
             </label>
             <select
               value={expiresHours}
               onChange={(e) => setExpiresHours(Number(e.target.value))}
-              className="md:col-span-2 rounded-lg bg-canvas border border-hairline px-3 py-2 text-sm text-ink focus:outline-none focus:border-tone/50"
+              className="md:col-span-2 rounded-lg bg-canvas border border-hairline px-3 py-2 text-base sm:text-sm text-ink focus:outline-none focus:border-tone/50"
             >
               <option value={24}>24 hours</option>
               <option value={72}>3 days</option>
@@ -203,7 +203,7 @@ export function ConsoleInvites({ invites, libraries, publicUrl, onChanged }: Pro
                 type="text"
                 readOnly
                 value={createdLink}
-                className="flex-1 rounded-lg bg-canvas border border-hairline px-3 py-1.5 text-xs font-mono text-ink"
+                className="flex-1 rounded-lg bg-canvas border border-hairline px-3 py-1.5 text-base sm:text-xs font-mono text-ink"
               />
               <button
                 type="button"

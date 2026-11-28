@@ -749,7 +749,7 @@ export function RequestsPage({
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="Search movies, TV shows, or anime to request…"
-                className="w-full rounded-xl bg-surface border border-hairline pl-10 pr-4 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/40 transition-colors"
+                className="w-full rounded-xl bg-surface border border-hairline pl-10 pr-4 py-2.5 text-base sm:text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/40 transition-colors"
               />
             </div>
 
@@ -819,7 +819,7 @@ export function RequestsPage({
                   aria-label="Sort titles"
                   value={sort}
                   onChange={(e) => handleSortChange(e.target.value as DiscoverSort)}
-                  className={`h-8 rounded-lg border px-2.5 text-xs tabular-nums transition-colors focus:outline-none cursor-pointer ${
+                  className={`h-8 rounded-lg border px-2.5 text-base sm:text-xs tabular-nums transition-colors focus:outline-none cursor-pointer ${
                     sort !== 'popularity'
                       ? 'bg-tone/12 border-tone/35 text-ink font-medium'
                       : 'bg-surface border-hairline text-ink-secondary hover:text-ink hover:border-tone/25'
@@ -835,7 +835,7 @@ export function RequestsPage({
                   aria-label="Filter by genre"
                   value={genre > 0 ? String(genre) : ''}
                   onChange={(e) => handleGenreChange(e.target.value ? Number(e.target.value) : 0)}
-                  className={`h-8 rounded-lg border px-2.5 text-xs tabular-nums transition-colors focus:outline-none cursor-pointer ${
+                  className={`h-8 rounded-lg border px-2.5 text-base sm:text-xs tabular-nums transition-colors focus:outline-none cursor-pointer ${
                     genre > 0
                       ? 'bg-tone/12 border-tone/35 text-ink font-medium'
                       : 'bg-surface border-hairline text-ink-secondary hover:text-ink hover:border-tone/25'
@@ -880,7 +880,7 @@ export function RequestsPage({
                               value={dateFrom}
                               max={dateTo || undefined}
                               onChange={(e) => handleDateRangeChange(e.target.value, dateTo)}
-                              className="w-full rounded-lg bg-canvas border border-hairline px-2 py-1.5 text-[11px] tabular-nums text-ink focus:outline-none focus:border-tone/40"
+                              className="w-full rounded-lg bg-canvas border border-hairline px-2 py-1.5 text-base sm:text-[11px] tabular-nums text-ink focus:outline-none focus:border-tone/40"
                             />
                           </div>
                           <div>
@@ -891,7 +891,7 @@ export function RequestsPage({
                               value={dateTo}
                               min={dateFrom || undefined}
                               onChange={(e) => handleDateRangeChange(dateFrom, e.target.value)}
-                              className="w-full rounded-lg bg-canvas border border-hairline px-2 py-1.5 text-[11px] tabular-nums text-ink focus:outline-none focus:border-tone/40"
+                              className="w-full rounded-lg bg-canvas border border-hairline px-2 py-1.5 text-base sm:text-[11px] tabular-nums text-ink focus:outline-none focus:border-tone/40"
                             />
                           </div>
                         </div>
@@ -908,7 +908,7 @@ export function RequestsPage({
                             handleYearChange(e.target.value ? Number(e.target.value) : 0);
                             setDatePopoverOpen(false);
                           }}
-                          className="w-full rounded-lg bg-canvas border border-hairline px-2.5 py-1.5 text-xs tabular-nums text-ink focus:outline-none focus:border-tone/40 cursor-pointer"
+                          className="w-full rounded-lg bg-canvas border border-hairline px-2.5 py-1.5 text-base sm:text-xs tabular-nums text-ink focus:outline-none focus:border-tone/40 cursor-pointer"
                         >
                           <option value="">Any year</option>
                           {DISCOVER_YEARS.map((y) => (
@@ -968,7 +968,7 @@ export function RequestsPage({
                   aria-label="Filter by minimum score"
                   value={minRating > 0 ? String(minRating) : ''}
                   onChange={(e) => handleMinRatingChange(e.target.value ? Number(e.target.value) : 0)}
-                  className={`h-8 rounded-lg border px-2.5 text-xs tabular-nums transition-colors focus:outline-none cursor-pointer ${
+                  className={`h-8 rounded-lg border px-2.5 text-base sm:text-xs tabular-nums transition-colors focus:outline-none cursor-pointer ${
                     minRating > 0
                       ? 'bg-tone/12 border-tone/35 text-ink font-medium'
                       : 'bg-surface border-hairline text-ink-secondary hover:text-ink hover:border-tone/25'
@@ -985,7 +985,7 @@ export function RequestsPage({
                     aria-label="Filter by language"
                     value={language}
                     onChange={(e) => handleLanguageChange(e.target.value)}
-                    className={`h-8 rounded-lg border px-2.5 text-xs tabular-nums transition-colors focus:outline-none cursor-pointer ${
+                    className={`h-8 rounded-lg border px-2.5 text-base sm:text-xs tabular-nums transition-colors focus:outline-none cursor-pointer ${
                       language !== ''
                         ? 'bg-tone/12 border-tone/35 text-ink font-medium'
                         : 'bg-surface border-hairline text-ink-secondary hover:text-ink hover:border-tone/25'
@@ -1489,7 +1489,7 @@ export function RequestsPage({
                           value={declineNote}
                           onChange={(e) => setDeclineNote(e.target.value)}
                           placeholder="Optional reason for declining…"
-                          className="flex-1 min-w-[200px] rounded-lg bg-canvas border border-hairline px-3 py-1.5 text-xs text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/40"
+                          className="flex-1 min-w-[200px] rounded-lg bg-canvas border border-hairline px-3 py-1.5 text-base sm:text-xs text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/40"
                         />
                         <button
                           type="button"

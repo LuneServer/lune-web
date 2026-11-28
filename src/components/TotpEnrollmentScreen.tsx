@@ -205,7 +205,7 @@ export function TotpEnrollmentScreen({ user, onCompleted, onSignOut }: Props) {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full rounded-lg bg-canvas border border-hairline px-3.5 py-2 text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+                  className="w-full rounded-lg bg-canvas border border-hairline px-3.5 py-2 text-base sm:text-sm text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
                 />
               </div>
               <div>
@@ -220,7 +220,7 @@ export function TotpEnrollmentScreen({ user, onCompleted, onSignOut }: Props) {
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
                   placeholder="123456"
-                  className="w-full rounded-lg bg-canvas border border-hairline px-3.5 py-2 text-sm font-mono tracking-wider text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
+                  className="w-full rounded-lg bg-canvas border border-hairline px-3.5 py-2 text-base sm:text-sm font-mono tracking-wider text-ink placeholder:text-ink-muted focus:outline-none focus:border-tone/50"
                 />
               </div>
             </div>
